@@ -1,4 +1,10 @@
 *.mp4
 *.DS_Store
+*.pyc
+*.xlsx
 __pycache__/
 .ipynb_checkpoints/
+.venv/
+output/
+videos/
+.claude/
