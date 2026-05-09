@@ -467,6 +467,34 @@ button.secondary:hover { background: rgba(59, 130, 246, 0.1); }
   white-space: nowrap;
 }
 
+/* ── Cursor UI — floating bubble over canvas ─────────────────── */
+#cursor-ui {
+  position: absolute;
+  z-index: 20;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+  pointer-events: auto;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+#cursor-ui[hidden] { display: none; }
+#cursor-ui input[type="text"] {
+  width: 100%;
+  font-size: 13px;
+  padding: 5px 8px;
+}
+.cursor-actions {
+  display: flex;
+  gap: 6px;
+}
+.cursor-actions button { flex: 1; font-size: 12px; padding: 5px 8px; }
+.cursor-error { font-size: 11px; color: var(--red); }
+
 /* ── Phase UI (panel sidebar, phases 2–4) ──────────────────── */
 #phase-ui { flex-shrink: 0; }
 #phase-ui:not(:empty) {

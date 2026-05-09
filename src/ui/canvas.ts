@@ -17,7 +17,6 @@ import { getOverlayPainter } from './overlay';
 
 const MAX_DISP_W = 1280;
 const MAX_DISP_H = 720;
-const AXIS_LEN = 40;
 
 export function fitDisplaySize(fw: number, fh: number): { dw: number; dh: number } {
   const s = Math.min(MAX_DISP_W / fw, MAX_DISP_H / fh, 1);
@@ -69,21 +68,35 @@ export function render(canvas: HTMLCanvasElement, source: CanvasImageSource, s: 
 function drawAxes(ctx: CanvasRenderingContext2D, s: AppState, dw: number, dh: number): void {
   if (!s.origin || !s.video) return;
   const { x: ox, y: oy } = origToDisp(s.origin.x, s.origin.y, s, dw, dh);
+  const CYAN = 'rgba(0, 220, 220, 0.55)';
+  const CYAN_SOLID = 'rgb(0, 220, 220)';
 
-  ctx.strokeStyle = 'rgb(0, 220, 220)';
-  ctx.fillStyle   = 'rgb(0, 220, 220)';
-  ctx.lineWidth   = 2;
+  ctx.save();
 
-  ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + AXIS_LEN, oy); ctx.stroke();
-  arrowhead(ctx, ox + AXIS_LEN, oy, 0);
-  ctx.font = '12px ui-monospace, monospace';
-  ctx.fillText('X', ox + AXIS_LEN + 4, oy + 5);
+  // Full-frame axis lines — thin, semi-transparent, extending to canvas edges
+  ctx.strokeStyle = CYAN;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(0, oy);  ctx.lineTo(dw, oy);  ctx.stroke(); // X axis (horizontal)
+  ctx.beginPath(); ctx.moveTo(ox, 0);  ctx.lineTo(ox, dh);  ctx.stroke(); // Y axis (vertical)
+  ctx.setLineDash([]);
 
-  ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox, oy - AXIS_LEN); ctx.stroke();
-  arrowhead(ctx, ox, oy - AXIS_LEN, -Math.PI / 2);
-  ctx.fillText('Y', ox + 4, oy - AXIS_LEN - 4);
+  // Edge labels — show axis name at the canvas boundary
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.fillStyle = CYAN_SOLID;
+  ctx.textAlign = 'left';
+  ctx.fillText('+X', dw - 22, oy - 5);       // right edge
+  ctx.textAlign = 'center';
+  ctx.fillText('+Y', ox + 2, 14);              // top edge (Y up = positive)
 
-  ctx.beginPath(); ctx.arc(ox, oy, 3, 0, Math.PI * 2); ctx.fill();
+  // Origin dot + "0" label
+  ctx.fillStyle = CYAN_SOLID;
+  ctx.beginPath(); ctx.arc(ox, oy, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('0', ox + 6, oy - 6);
+
+  ctx.restore();
 }
 
 function drawScaleLine(ctx: CanvasRenderingContext2D, s: AppState, dw: number, dh: number): void {
@@ -107,23 +120,9 @@ function drawBbox(ctx: CanvasRenderingContext2D, s: AppState, dw: number, dh: nu
   const tl = origToDisp(s.bbox.x, s.bbox.y, s, dw, dh);
   const br = origToDisp(s.bbox.x + s.bbox.w, s.bbox.y + s.bbox.h, s, dw, dh);
   ctx.save();
-  ctx.strokeStyle = '#4ade80';
+  ctx.strokeStyle = '#008000';
   ctx.lineWidth = 2;
   ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-  ctx.restore();
-}
-
-function arrowhead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number): void {
-  const len = 8;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-len, -len / 2);
-  ctx.lineTo(-len,  len / 2);
-  ctx.closePath();
-  ctx.fill();
   ctx.restore();
 }
 

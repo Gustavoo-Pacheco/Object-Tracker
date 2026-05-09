@@ -22,6 +22,7 @@ const stageArea   = document.getElementById('stage-area')!;
 const cvStatus    = document.getElementById('cv-status')!;
 const navBar      = document.getElementById('nav-bar')!;
 const phaseUi     = document.getElementById('phase-ui')!;
+const cursorUi    = document.getElementById('cursor-ui')!;
 
 const toolAxisBtn  = document.getElementById('tool-axis')  as HTMLButtonElement;
 const toolScaleBtn = document.getElementById('tool-scale') as HTMLButtonElement;
@@ -50,57 +51,59 @@ let unmountCurrent: (() => void) | undefined;
 
 const TOOL_PHASES = new Set<Phase>(['setup', 'origin', 'scale', 'bbox']);
 
-function mountSetup(): () => void {
-  function renderSetup(s: AppState): void {
-    const originDone = s.origin !== null;
-    const scaleDone  = s.metresPerPixel !== null;
-    const bboxDone   = s.bbox !== null;
-    const allDone    = originDone && scaleDone && bboxDone;
+// Setup panel stays mounted for the entire setup/origin/scale/bbox group.
+// Tool phases (origin/scale/bbox) additionally mount their cursor UI over the canvas.
+let unmountSetup: (() => void) | undefined;
+let unmountTool: (() => void) | undefined;
 
-    phaseUi.innerHTML = `
-      <h2>${t('setup.title')}</h2>
-      <p class="hint">${t('setup.hint')}</p>
-      <ul class="setup-status">
-        <li class="setup-item">
-          <span class="setup-dot ${originDone ? 'done' : 'pending'}"></span>
-          <span>${t('tool.axis')}</span>
-          <span class="value">${originDone
-            ? `(${s.origin!.x}, ${s.origin!.y})`
-            : t('setup.not_set')}</span>
-        </li>
-        <li class="setup-item">
-          <span class="setup-dot ${scaleDone ? 'done' : 'pending'}"></span>
-          <span>${t('tool.scale')}</span>
-          <span class="value">${scaleDone
-            ? s.metresPerPixel!.toExponential(3) + ' m/px'
-            : t('setup.not_set')}</span>
-        </li>
-        <li class="setup-item">
-          <span class="setup-dot ${bboxDone ? 'done' : 'pending'}"></span>
-          <span>${t('tool.bbox')}</span>
-          <span class="value">${bboxDone
-            ? `${s.bbox!.w}×${s.bbox!.h} px`
-            : t('setup.not_set')}</span>
-        </li>
-      </ul>
-      <button id="run-from-setup" ${allDone ? '' : 'disabled'}>${t('setup.run')}</button>
-    `;
+function renderSetupPanel(s: AppState): void {
+  const originDone = s.origin !== null;
+  const scaleDone  = s.metresPerPixel !== null;
+  const bboxDone   = s.bbox !== null;
+  const allDone    = originDone && scaleDone && bboxDone;
 
-    phaseUi.querySelector('#run-from-setup')?.addEventListener('click', () => {
-      setState({ phase: 'tracking' });
-    });
-  }
+  phaseUi.innerHTML = `
+    <h2>${t('setup.title')}</h2>
+    <ul class="setup-status">
+      <li class="setup-item">
+        <span class="setup-dot ${originDone ? 'done' : 'pending'}"></span>
+        <span>${t('tool.axis')}</span>
+        <span class="value">${originDone ? `(${s.origin!.x}, ${s.origin!.y})` : t('setup.not_set')}</span>
+      </li>
+      <li class="setup-item">
+        <span class="setup-dot ${scaleDone ? 'done' : 'pending'}"></span>
+        <span>${t('tool.scale')}</span>
+        <span class="value">${scaleDone ? `${(s.metresPerPixel! * 1000).toFixed(3)} mm/px` : t('setup.not_set')}</span>
+      </li>
+      <li class="setup-item">
+        <span class="setup-dot ${bboxDone ? 'done' : 'pending'}"></span>
+        <span>${t('tool.bbox')}</span>
+        <span class="value">${bboxDone ? `${s.bbox!.w}×${s.bbox!.h} px` : t('setup.not_set')}</span>
+      </li>
+    </ul>
+    <button id="run-from-setup" ${allDone ? '' : 'disabled'}>${t('setup.run')}</button>
+  `;
 
-  const unsub = subscribe((s) => {
-    if (s.phase === 'setup') renderSetup(s);
+  phaseUi.querySelector('#run-from-setup')?.addEventListener('click', () => {
+    setState({ phase: 'tracking' });
   });
+}
 
-  renderSetup(getState());
+function mountSetupGroup(): void {
+  renderSetupPanel(getState());
+  const unsub = subscribe((s) => {
+    if (TOOL_PHASES.has(s.phase)) renderSetupPanel(s);
+  });
+  unmountSetup = () => { unsub(); phaseUi.innerHTML = ''; };
+}
 
-  return () => {
-    unsub();
-    phaseUi.innerHTML = '';
-  };
+function unmountSetupGroup(): void {
+  unmountSetup?.();
+  unmountSetup = undefined;
+  unmountTool?.();
+  unmountTool = undefined;
+  cursorUi.setAttribute('hidden', '');
+  cursorUi.innerHTML = '';
 }
 
 subscribe((s) => {
@@ -125,20 +128,36 @@ subscribe((s) => {
   toolBboxBtn.classList.toggle('done',  s.bbox !== null && s.phase !== 'bbox');
 
   if (s.phase !== currentPhase) {
-    unmountCurrent?.();
-    unmountCurrent = undefined;
+    const wasInSetupGroup = TOOL_PHASES.has(currentPhase);
+    const nowInSetupGroup = TOOL_PHASES.has(s.phase);
     currentPhase = s.phase;
+
+    // Tear down previous non-setup-group phases
+    if (!wasInSetupGroup) {
+      unmountCurrent?.();
+      unmountCurrent = undefined;
+    }
+
+    // Mount/unmount the setup panel group as a whole
+    if (!wasInSetupGroup && nowInSetupGroup) {
+      mountSetupGroup();
+    } else if (wasInSetupGroup && !nowInSetupGroup) {
+      unmountSetupGroup();
+      unmountCurrent?.();
+      unmountCurrent = undefined;
+    }
+
+    // Mount per-tool cursor UI
+    if (nowInSetupGroup) {
+      unmountTool?.();
+      unmountTool = undefined;
+      if (s.phase === 'origin') unmountTool = mountOrigin(canvas, cursorUi);
+      else if (s.phase === 'scale') unmountTool = mountScale(canvas, cursorUi);
+      else if (s.phase === 'bbox') unmountTool = mountBbox(canvas, cursorUi);
+    }
 
     if (s.phase === 'navigate') {
       unmountCurrent = mountNavigate(navBar, (_idx) => {});
-    } else if (s.phase === 'setup') {
-      unmountCurrent = mountSetup();
-    } else if (s.phase === 'origin') {
-      unmountCurrent = mountOrigin(phaseUi, canvas);
-    } else if (s.phase === 'scale') {
-      unmountCurrent = mountScale(phaseUi, canvas);
-    } else if (s.phase === 'bbox') {
-      unmountCurrent = mountBbox(phaseUi, canvas);
     }
   }
 
