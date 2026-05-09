@@ -2,7 +2,7 @@ import '@fontsource-variable/inter-tight';
 import '@fontsource-variable/jetbrains-mono';
 import './styles.css';
 import { applyDom } from './i18n';
-import { getState, setState, subscribe, type Phase } from './state';
+import { getState, subscribe, type Phase } from './state';
 import { render, attachZoomPan, fitDisplaySize } from './ui/canvas';
 import { loadVideo } from './video/loader';
 import { FrameCache } from './video/cache';
@@ -15,7 +15,7 @@ const dropOverlay = document.getElementById('drop-overlay')!;
 const fileInput   = document.getElementById('file')       as HTMLInputElement;
 const stageWrap   = document.getElementById('stage-wrap')!;
 const cvStatus    = document.getElementById('cv-status')!;
-const phaseUi     = document.getElementById('phase-ui')!;
+const navBar      = document.getElementById('nav-bar')!;
 
 const cache = new FrameCache();
 
@@ -46,11 +46,10 @@ subscribe((s) => {
   if (s.phase !== currentPhase) {
     unmountCurrent?.();
     unmountCurrent = undefined;
-    phaseUi.innerHTML = '';
     currentPhase = s.phase;
 
     if (s.phase === 'navigate') {
-      unmountCurrent = mountNavigate(phaseUi, (_idx) => {
+      unmountCurrent = mountNavigate(navBar, (_idx) => {
         // step 5 will mount the origin phase here
       });
     }
@@ -59,10 +58,7 @@ subscribe((s) => {
   queueRender();
 });
 
-// Reset state to idle also resets cached frames
-subscribe((s) => {
-  if (!s.video) cache.clear();
-});
+subscribe((s) => { if (!s.video) cache.clear(); });
 
 attachZoomPan(canvas);
 
@@ -92,19 +88,8 @@ fileInput.addEventListener('change', () => {
   if (fileInput.files?.[0]) handleVideoFile(fileInput.files[0]);
 });
 
-// ── Resize: re-render when stage area changes ─────────────────
 new ResizeObserver(queueRender).observe(stageWrap);
 
-// ── Initial canvas size ───────────────────────────────────────
 const { dw, dh } = fitDisplaySize(1920, 1080);
 canvas.width  = dw;
 canvas.height = dh;
-
-// Keep O key for dev convenience (set origin at centre)
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'o' || e.key === 'O') {
-    const s = getState();
-    if (!s.video || s.phase !== 'navigate') return;
-    setState({ origin: { x: s.video.width / 2, y: s.video.height / 2 } });
-  }
-});
