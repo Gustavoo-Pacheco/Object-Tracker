@@ -18,9 +18,10 @@
   "cv.ready":   "OpenCV pronto",
   "cv.error":   "Falha ao carregar OpenCV",
 
-  "phase1.title":     "1 · Frame inicial",
-  "phase1.confirm":   "Confirmar frame inicial",
-  "phase1.shortcuts": "← → ±1 frame   W/S ±10 frames   scroll = zoom   arraste = pan",
+  "phase1.title":      "1 · Frame inicial",
+  "phase1.confirm":    "Confirmar frame inicial",
+  "phase1.step_label": "passo",
+  "phase1.shortcuts":  "← → ±1  ·  W/S ±passo  ·  +/− zoom  ·  arraste = pan",
 
   "phase2.title":       "2 · Origem (0,0)",
   "phase2.instruction": "Clique no ponto que será a origem do sistema de coordenadas.",

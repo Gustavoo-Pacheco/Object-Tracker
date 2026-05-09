@@ -3,6 +3,14 @@ import { t } from '../i18n';
 
 let currentObjectUrl: string | null = null;
 
+export function clearVideo(): void {
+  if (currentObjectUrl) {
+    URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = null;
+  }
+  (document.getElementById('src') as HTMLVideoElement).src = '';
+}
+
 export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<void> {
   onBeforeLoad?.();
 

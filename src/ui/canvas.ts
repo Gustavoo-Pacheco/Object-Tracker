@@ -164,21 +164,25 @@ export function attachZoomPan(canvas: HTMLCanvasElement): void {
         zoomAt(dw / 2, dh / 2, 1 / 1.15, dw, dh);
         break;
       case 'ArrowLeft': case 'j': case 'J': {
+        if (e.key === 'ArrowLeft' && s.phase === 'navigate') break;
         const pan = clampPan(s.pan.x - panStep.x, s.pan.y, s.zoom, s.video.width, s.video.height);
         setState({ pan });
         break;
       }
       case 'ArrowRight': case 'l': case 'L': {
+        if (e.key === 'ArrowRight' && s.phase === 'navigate') break;
         const pan = clampPan(s.pan.x + panStep.x, s.pan.y, s.zoom, s.video.width, s.video.height);
         setState({ pan });
         break;
       }
       case 'ArrowUp': case 'i': case 'I': {
+        if (e.key === 'ArrowUp' && s.phase === 'navigate') break;
         const pan = clampPan(s.pan.x, s.pan.y - panStep.y, s.zoom, s.video.width, s.video.height);
         setState({ pan });
         break;
       }
       case 'ArrowDown': case 'k': case 'K': {
+        if (e.key === 'ArrowDown' && s.phase === 'navigate') break;
         const pan = clampPan(s.pan.x, s.pan.y + panStep.y, s.zoom, s.video.width, s.video.height);
         setState({ pan });
         break;
