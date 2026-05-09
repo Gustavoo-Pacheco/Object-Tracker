@@ -1,0 +1,4 @@
+opencv.js 4.10.0
+Source: https://docs.opencv.org/4.10.0/opencv.js
+Downloaded: 2026-05-09
+Note: WASM is embedded as base64 in opencv.js (no separate .wasm file needed)

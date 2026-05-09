@@ -1,0 +1,19 @@
+{
+  "name": "object-tracker",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.0.10"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter-tight": "^5.2.7",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8"
+  }
+}

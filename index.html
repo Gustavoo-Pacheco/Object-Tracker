@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Object Tracker</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <nav id="toolbar">
+      <span class="app-title" data-i18n="app.title">Object Tracker</span>
+      <div class="tool-group">
+        <button id="tool-axis" class="tool-btn" disabled data-i18n="tool.axis">Definir Eixo</button>
+        <button id="tool-scale" class="tool-btn" disabled data-i18n="tool.scale">Medida de Referência</button>
+        <button id="tool-bbox" class="tool-btn" disabled data-i18n="tool.bbox">Selecionar Objeto</button>
+      </div>
+      <div class="toolbar-right">
+        <span id="cv-status" class="hint"></span>
+      </div>
+    </nav>
+
+    <main>
+      <section id="stage-wrap">
+        <video id="src" hidden playsinline muted></video>
+        <canvas id="stage"></canvas>
+        <div id="drop-overlay">
+          <div class="drop-inner">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p data-i18n="stage.drop">Arraste um vídeo aqui</p>
+            <p class="hint" data-i18n="stage.drop_hint">ou use o seletor abaixo</p>
+            <label class="file-label">
+              <input type="file" id="file" accept="video/*" />
+              <span data-i18n="stage.browse">Escolher arquivo</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- playback controls — shown after tracking completes -->
+        <div id="playback-controls" hidden>
+          <button id="pb-step-back" class="pb-btn" title="Frame anterior (←)">&#9664;</button>
+          <button id="pb-play" class="pb-btn" data-i18n="pb.play">&#9654;</button>
+          <button id="pb-step-fwd" class="pb-btn" title="Próximo frame (→)">&#9654;&#9654;</button>
+          <span id="pb-counter" class="tabular">0 / 0</span>
+        </div>
+      </section>
+
+      <aside id="panel">
+        <section id="plot-wrap">
+          <h2 data-i18n="plot.title">Trajetória</h2>
+          <div id="plot">
+            <p class="plot-empty hint" data-i18n="plot.empty">Nenhum dado. Rastreie um vídeo para ver os resultados.</p>
+          </div>
+        </section>
+
+        <section id="table-wrap">
+          <h2 data-i18n="table.title">Dados</h2>
+          <div id="data-table-scroll">
+            <table id="data-table">
+              <thead>
+                <tr>
+                  <th data-i18n="col.time">tempo (s)</th>
+                  <th data-i18n="col.x">x (m)</th>
+                  <th data-i18n="col.y">y (m)</th>
+                  <th data-i18n="col.vx">vx (m/s)</th>
+                  <th data-i18n="col.vy">vy (m/s)</th>
+                </tr>
+              </thead>
+              <tbody id="table-body"></tbody>
+            </table>
+            <p id="table-empty" class="hint" data-i18n="table.empty">—</p>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

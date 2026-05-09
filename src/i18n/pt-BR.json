@@ -1,0 +1,72 @@
+{
+  "app.title": "Object Tracker",
+
+  "tool.axis":  "Definir Eixo",
+  "tool.scale": "Medida de Referência",
+  "tool.bbox":  "Selecionar Objeto",
+
+  "stage.drop":      "Arraste um vídeo aqui",
+  "stage.drop_hint": "ou use o seletor abaixo",
+  "stage.browse":    "Escolher arquivo",
+
+  "status.empty":    "Carregue um vídeo para começar",
+  "status.loaded":   "{name} — {w}×{h}, {n} frames @ {fps} fps",
+  "status.tracking": "Rastreando: {done}/{total}",
+  "status.done":     "Rastreamento concluído",
+
+  "cv.loading": "Carregando OpenCV…",
+  "cv.ready":   "OpenCV pronto",
+  "cv.error":   "Falha ao carregar OpenCV",
+
+  "phase1.title":     "1 · Frame inicial",
+  "phase1.confirm":   "Confirmar frame inicial",
+  "phase1.shortcuts": "← → ±1 frame   W/S ±10 frames   scroll = zoom   arraste = pan",
+
+  "phase2.title":       "2 · Origem (0,0)",
+  "phase2.instruction": "Clique no ponto que será a origem do sistema de coordenadas.",
+  "phase2.confirm":     "Confirmar origem",
+
+  "phase3.title":       "3 · Escala",
+  "phase3.instruction": "Clique em dois pontos com distância conhecida.",
+  "phase3.metres":      "Distância (m)",
+  "phase3.confirm":     "Confirmar escala",
+  "phase3.redo":        "Refazer linha",
+
+  "phase4.title":       "4 · Objeto",
+  "phase4.instruction": "Clique e arraste um retângulo em volta do objeto.",
+  "phase4.confirm":     "Iniciar rastreamento",
+  "phase4.redo":        "Refazer caixa",
+
+  "tracking.cancel":  "Cancelar",
+  "tracking.lost":    "Frames perdidos",
+  "tracking.elapsed": "Tempo decorrido",
+
+  "pb.play":  "▶",
+  "pb.pause": "⏸",
+
+  "results.title":         "Resultados",
+  "results.tracked":       "Rastreados",
+  "results.lost":          "Perdidos",
+  "results.fill_nan":      "Preencher NaN com média dos 2 últimos",
+  "results.restart":       "Reiniciar",
+
+  "plot.title": "Trajetória",
+  "plot.empty": "Nenhum dado. Rastreie um vídeo para ver os resultados.",
+  "plot.axis.x": "x (m)",
+  "plot.axis.y": "y (m)",
+
+  "table.title": "Dados",
+  "table.empty": "—",
+
+  "col.time": "tempo (s)",
+  "col.x":    "x (m)",
+  "col.y":    "y (m)",
+  "col.vx":   "vx (m/s)",
+  "col.vy":   "vy (m/s)",
+
+  "export.download": "Baixar CSV",
+
+  "errors.video_load":    "Falha ao carregar vídeo",
+  "errors.opencv_load":   "Falha ao carregar OpenCV",
+  "errors.bbox_too_small": "Caixa delimitadora muito pequena"
+}
