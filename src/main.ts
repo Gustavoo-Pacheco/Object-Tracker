@@ -14,6 +14,7 @@ const canvas      = document.getElementById('stage')      as HTMLCanvasElement;
 const dropOverlay = document.getElementById('drop-overlay')!;
 const fileInput   = document.getElementById('file')       as HTMLInputElement;
 const stageWrap   = document.getElementById('stage-wrap')!;
+const stageArea   = document.getElementById('stage-area')!;
 const cvStatus    = document.getElementById('cv-status')!;
 const navBar      = document.getElementById('nav-bar')!;
 
@@ -88,7 +89,7 @@ fileInput.addEventListener('change', () => {
   if (fileInput.files?.[0]) handleVideoFile(fileInput.files[0]);
 });
 
-new ResizeObserver(queueRender).observe(stageWrap);
+new ResizeObserver(queueRender).observe(stageArea);
 
 const { dw, dh } = fitDisplaySize(1920, 1080);
 canvas.width  = dw;

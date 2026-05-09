@@ -135,13 +135,21 @@ main {
 /* ── Stage ───────────────────────────────────────────────────── */
 #stage-wrap {
   grid-area: stage;
-  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+}
+
+#stage-area {
+  flex: 1;
+  min-height: 0;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-right: 1px solid var(--line);
+  background: var(--bg);
 }
 
 #stage {
@@ -367,15 +375,13 @@ button.secondary:hover { background: rgba(59, 130, 246, 0.1); }
    NAVIGATE BAR — bottom of stage, phase 1
 ══════════════════════════════════════════════════════════════ */
 #nav-bar {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  background: rgba(11, 13, 16, 0.94);
+  flex-shrink: 0;
+  background: var(--surface-1);
   border-top: 1px solid var(--line);
   padding: 8px 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 10;
 }
 #nav-bar[hidden] { display: none; }
 
