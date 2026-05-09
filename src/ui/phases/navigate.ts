@@ -55,7 +55,7 @@ export function mountNavigate(
 
   function confirmCurrent(): void {
     const cur = getState();
-    setState({ startFrame: cur.frameIdx, phase: 'origin' });
+    setState({ startFrame: cur.frameIdx, phase: 'setup' });
     onConfirm(cur.frameIdx);
   }
 
@@ -105,6 +105,7 @@ function cancelToIdle(): void {
     zoom: 1,
     pan: { x: 0, y: 0 },
     origin: null,
+    scalePts: null,
     metresPerPixel: null,
     bbox: null,
     startFrame: null,

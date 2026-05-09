@@ -1,4 +1,4 @@
-export type Phase = 'idle' | 'navigate' | 'origin' | 'scale' | 'bbox' | 'tracking' | 'done';
+export type Phase = 'idle' | 'navigate' | 'setup' | 'origin' | 'scale' | 'bbox' | 'tracking' | 'done';
 
 export type TrackRecord = [
   number,         // frame index
@@ -16,6 +16,7 @@ export type AppState = {
   zoom: number;
   pan: { x: number; y: number };
   origin: { x: number; y: number } | null;
+  scalePts: [{ x: number; y: number }, { x: number; y: number }] | null;
   metresPerPixel: number | null;
   bbox: { x: number; y: number; w: number; h: number } | null;
   startFrame: number | null;
@@ -30,6 +31,7 @@ const state: AppState = {
   zoom: 1,
   pan: { x: 0, y: 0 },
   origin: null,
+  scalePts: null,
   metresPerPixel: null,
   bbox: null,
   startFrame: null,
@@ -49,3 +51,5 @@ export const subscribe = (fn: Listener): (() => void) => {
   listeners.add(fn);
   return () => listeners.delete(fn);
 };
+
+export const triggerRender = (): void => { listeners.forEach(l => l(state)); };

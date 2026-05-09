@@ -482,6 +482,86 @@ button.secondary:hover { background: rgba(59, 130, 246, 0.1); }
   margin-bottom: 10px;
 }
 
+.phase-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.phase-actions button { flex: 1; min-width: 0; font-size: 12px; padding: 6px 10px; }
+
+.phase-readout {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.readout-label { flex-shrink: 0; }
+
+.phase-error {
+  font-size: 12px;
+  color: var(--red);
+  margin-top: 6px;
+}
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+#phase-ui input[type="text"] { width: 100%; }
+
+/* Setup summary */
+.setup-status {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+.setup-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.setup-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.setup-dot.done    { background: var(--green); }
+.setup-dot.pending { background: var(--line); border: 1px solid var(--muted); }
+.setup-item .value {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+  text-align: right;
+}
+#phase-ui #run-from-setup { width: 100%; font-size: 13px; padding: 8px; }
+
+/* Tool button done indicator */
+.tool-btn.done::after {
+  content: '●';
+  font-size: 6px;
+  color: var(--green);
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
 input[type="number"], input[type="text"], select {
   background: var(--surface-2);
   color: var(--fg);

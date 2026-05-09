@@ -1,16 +1,19 @@
 /**
  * Coordinate systems:
  *   Original frame  (fw × fh)  — raw video dimensions; origin/bbox stored here
- *   Display         (dw × dh)  — canvas CSS pixels; mouse events arrive here
- *   Viewport        (vw × vh)  — slice of the original frame currently visible
- *                               vw = fw/zoom, vh = fh/zoom
+ *   Display         (dw × dh)  — canvas pixel dimensions; overlay painters work here
  *
  * Conversion display → original:
  *   origX = pan.x + (dx / dw) * vw
  *   origY = pan.y + (dy / dh) * vh
+ *
+ * Conversion original → display (inverse):
+ *   dx = ((ox - pan.x) / vw) * dw
+ *   dy = ((oy - pan.y) / vh) * dh
  */
 
 import { getState, setState, type AppState } from '../state';
+import { getOverlayPainter } from './overlay';
 
 const MAX_DISP_W = 1280;
 const MAX_DISP_H = 720;
@@ -33,6 +36,18 @@ export function dispToOrig(
   };
 }
 
+export function origToDisp(
+  ox: number, oy: number,
+  s: AppState, dw: number, dh: number
+): { x: number; y: number } {
+  const vw = s.video!.width / s.zoom;
+  const vh = s.video!.height / s.zoom;
+  return {
+    x: ((ox - s.pan.x) / vw) * dw,
+    y: ((oy - s.pan.y) / vh) * dh,
+  };
+}
+
 export function render(canvas: HTMLCanvasElement, source: CanvasImageSource, s: AppState): void {
   if (!s.video) return;
   const ctx = canvas.getContext('2d')!;
@@ -46,32 +61,56 @@ export function render(canvas: HTMLCanvasElement, source: CanvasImageSource, s: 
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(source, s.pan.x, s.pan.y, vw, vh, 0, 0, dw, dh);
   drawAxes(ctx, s, dw, dh);
+  drawScaleLine(ctx, s, dw, dh);
+  drawBbox(ctx, s, dw, dh);
+  getOverlayPainter()?.(ctx, dw, dh);
 }
 
 function drawAxes(ctx: CanvasRenderingContext2D, s: AppState, dw: number, dh: number): void {
   if (!s.origin || !s.video) return;
-  const vw = s.video.width / s.zoom;
-  const vh = s.video.height / s.zoom;
-  const ox = ((s.origin.x - s.pan.x) / vw) * dw;
-  const oy = ((s.origin.y - s.pan.y) / vh) * dh;
+  const { x: ox, y: oy } = origToDisp(s.origin.x, s.origin.y, s, dw, dh);
 
   ctx.strokeStyle = 'rgb(0, 220, 220)';
   ctx.fillStyle   = 'rgb(0, 220, 220)';
   ctx.lineWidth   = 2;
 
-  // X axis →
   ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + AXIS_LEN, oy); ctx.stroke();
   arrowhead(ctx, ox + AXIS_LEN, oy, 0);
   ctx.font = '12px ui-monospace, monospace';
   ctx.fillText('X', ox + AXIS_LEN + 4, oy + 5);
 
-  // Y axis ↑ (up = positive, matches CLI's y-flip)
   ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox, oy - AXIS_LEN); ctx.stroke();
   arrowhead(ctx, ox, oy - AXIS_LEN, -Math.PI / 2);
   ctx.fillText('Y', ox + 4, oy - AXIS_LEN - 4);
 
-  // origin dot
   ctx.beginPath(); ctx.arc(ox, oy, 3, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawScaleLine(ctx: CanvasRenderingContext2D, s: AppState, dw: number, dh: number): void {
+  if (!s.scalePts || !s.video) return;
+  const a = origToDisp(s.scalePts[0].x, s.scalePts[0].y, s, dw, dh);
+  const b = origToDisp(s.scalePts[1].x, s.scalePts[1].y, s, dw, dh);
+  ctx.save();
+  ctx.strokeStyle = '#f472b6';
+  ctx.fillStyle = '#f472b6';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(a.x, a.y, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawBbox(ctx: CanvasRenderingContext2D, s: AppState, dw: number, dh: number): void {
+  if (!s.bbox || !s.video) return;
+  const tl = origToDisp(s.bbox.x, s.bbox.y, s, dw, dh);
+  const br = origToDisp(s.bbox.x + s.bbox.w, s.bbox.y + s.bbox.h, s, dw, dh);
+  ctx.save();
+  ctx.strokeStyle = '#4ade80';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  ctx.restore();
 }
 
 function arrowhead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number): void {
@@ -112,26 +151,37 @@ function zoomAt(dx: number, dy: number, factor: number, dw: number, dh: number):
   setState({ zoom: newZoom, pan });
 }
 
+const TOOL_PHASES = new Set(['setup', 'origin', 'scale', 'bbox']);
+
 export function attachZoomPan(canvas: HTMLCanvasElement): void {
   let dragging = false;
   let dragStart = { mx: 0, my: 0, px: 0, py: 0 };
+  let spaceHeld = false;
 
-  // Wheel → zoom toward cursor
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  window.addEventListener('keydown', e => { if (e.code === 'Space') spaceHeld = true; });
+  window.addEventListener('keyup',   e => { if (e.code === 'Space') spaceHeld = false; });
+
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
-    const dx = e.clientX - rect.left;
-    const dy = e.clientY - rect.top;
+    const dx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const dy = (e.clientY - rect.top)  * (canvas.height / rect.height);
     zoomAt(dx, dy, e.deltaY < 0 ? 1.15 : 1 / 1.15, canvas.width, canvas.height);
   }, { passive: false });
 
-  // Drag → pan
   canvas.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
+    const phase = getState().phase;
+    const inToolPhase = TOOL_PHASES.has(phase);
+    // right-click always pans; left-click pans only outside tool phases or when Space held
+    const shouldPan = e.button === 2 || (e.button === 0 && (!inToolPhase || spaceHeld));
+    if (!shouldPan) return;
     const s = getState();
     dragging = true;
     dragStart = { mx: e.clientX, my: e.clientY, px: s.pan.x, py: s.pan.y };
   });
+
   window.addEventListener('mousemove', (e) => {
     if (!dragging) return;
     const s = getState();
@@ -144,9 +194,9 @@ export function attachZoomPan(canvas: HTMLCanvasElement): void {
     const pan = clampPan(dragStart.px + dx, dragStart.py + dy, s.zoom, s.video.width, s.video.height);
     setState({ pan });
   });
+
   window.addEventListener('mouseup', () => { dragging = false; });
 
-  // Keyboard zoom/pan
   window.addEventListener('keydown', (e) => {
     const s = getState();
     if (!s.video) return;
