@@ -16,16 +16,42 @@ export type Center = { cx: number; cy: number };
 
 const SEARCH_PAD = 1.0;       // search window grows by template_dim * (1 + 2*pad)
 const TEMPLATE_LR = 0.05;     // learning rate for online template update
-const ACCEPT_NCC = 0.30;      // below this NCC, treat the frame as "lost"
+// Lost detection is gated against a FROZEN reference template (the appearance
+// at init time), not the drifting live template. This is what makes the lost
+// flag actually fire — comparing against the live template would always score
+// high since it adapts to whatever the tracker is matching.
+// Commit gate uses the LIVE-template score (peak.score) — the live template
+// adapts to the object's current appearance, so this stays high through blur
+// and gradual changes. Frozen-reference score is used only to gate template
+// updates (so we don't drift onto background) and as a long-term lost signal.
+const LIVE_CONFIDENT_NCC = 0.45;  // live-template score required to commit bbox
+const UPDATE_NCC = 0.50;          // frozen-ref score required to adapt live template
+const REF_LOST_NCC = 0.25;        // frozen-ref score below this for many frames → fully lost
+const LOST_PAD_GROWTH = 0.4;  // extra SEARCH_PAD per consecutive low-confidence frame
+const MAX_PAD = 3.0;          // cap search window so a missing object can't grab a random match
+const MAX_LOST_FRAMES = 2;    // surface "lost" to caller after this many misses
+// Per-pixel std of the matched patch must exceed this fraction of the original
+// template's std to be considered an object match. With NCC permissive enough
+// to allow blur, the patch-std gate is the primary defense against the bbox
+// jumping onto featureless background (sky, wall, floor) when the object
+// leaves the frame. Blur reduces high-frequency content but preserves overall
+// std, so this still passes blurred objects.
+const MIN_PATCH_STD_RATIO = 0.45;
+
+export type TrackResult = { bbox: Bbox; center: Center; score: number };
 
 export class Tracker {
-  private template: Float32Array | null = null;  // grayscale, mean-subtracted
-  private templateNorm = 0;                       // sqrt(sum of squares)
+  private template: Float32Array | null = null;  // grayscale, mean-subtracted (drifts)
+  private templateNorm = 0;
+  private refTemplate: Float32Array | null = null; // FROZEN appearance at init
+  private refNorm = 0;
   private tw = 0;
   private th = 0;
   private bbox: Bbox | null = null;
   private frameW = 0;
   private frameH = 0;
+  private lostFrames = 0;
+  private minPatchNorm = 0; // patch-norm threshold: matches below are background
 
   // The cv arg is ignored — kept for API parity with the planned OpenCV path.
   constructor(_cv?: unknown) { /* no cv needed */ }
@@ -41,15 +67,23 @@ export class Tracker {
     const { centred, norm } = meanSubtractAndNorm(tpl);
     this.template = centred;
     this.templateNorm = norm;
+    // Frozen reference: a copy that never adapts, used to decide "lost".
+    this.refTemplate = new Float32Array(centred);
+    this.refNorm = norm;
+    this.minPatchNorm = norm * MIN_PATCH_STD_RATIO;
+    this.lostFrames = 0;
   }
 
-  update(pixels: Uint8Array): { bbox: Bbox; center: Center } | null {
-    if (!this.template || !this.bbox) throw new Error('Tracker not initialised');
+  update(pixels: Uint8Array): TrackResult | null {
+    if (!this.template || !this.refTemplate || !this.bbox) throw new Error('Tracker not initialised');
     const gray = toGray(pixels, this.frameW, this.frameH);
 
-    // Search window centred on previous bbox, padded by SEARCH_PAD * size.
-    const padX = Math.round(this.tw * SEARCH_PAD);
-    const padY = Math.round(this.th * SEARCH_PAD);
+    // Search window grows with consecutive low-confidence frames so a fast or
+    // briefly-blurred object can be re-acquired instead of being permanently
+    // lost outside the original window.
+    const pad = Math.min(MAX_PAD, SEARCH_PAD + this.lostFrames * LOST_PAD_GROWTH);
+    const padX = Math.round(this.tw * pad);
+    const padY = Math.round(this.th * pad);
     const sx = Math.max(0, this.bbox.x - padX);
     const sy = Math.max(0, this.bbox.y - padY);
     const ex = Math.min(this.frameW, this.bbox.x + this.tw + padX);
@@ -58,34 +92,67 @@ export class Tracker {
     const sh = ey - sy;
     if (sw < this.tw || sh < this.th) return null;
 
+    // Match using the (adapting) live template — better recall under appearance change.
     const window = cropFloat(gray, this.frameW, sx, sy, sw, sh);
     const peak = nccPeak(window, sw, sh, this.template, this.tw, this.th, this.templateNorm);
-    if (!peak) return null;
-    if (peak.score < ACCEPT_NCC) return null;
+    if (!peak) {
+      this.lostFrames++;
+      return this.lostFrames > MAX_LOST_FRAMES ? null : { bbox: this.bbox, center: { cx: this.bbox.x + this.tw / 2, cy: this.bbox.y + this.th / 2 }, score: 0 };
+    }
 
     const newX = sx + peak.x;
     const newY = sy + peak.y;
-    this.bbox = { x: newX, y: newY, w: this.tw, h: this.th };
 
-    // Online template update — slow LR avoids drift on occlusions.
+    // Score the matched patch against the FROZEN reference. This is the
+    // signal that actually goes negative when the tracker has drifted onto
+    // background or the object has disappeared.
     const fresh = cropFloat(gray, this.frameW, newX, newY, this.tw, this.th);
-    const { centred: freshC, norm: _freshN } = meanSubtractAndNorm(fresh);
-    for (let i = 0; i < this.template.length; i++) {
-      this.template[i] = (1 - TEMPLATE_LR) * this.template[i] + TEMPLATE_LR * freshC[i];
+    const { centred: freshC, norm: freshN } = meanSubtractAndNorm(fresh);
+    let dot = 0;
+    for (let i = 0; i < this.refTemplate.length; i++) dot += freshC[i] * this.refTemplate[i];
+    const refScore = dot / (freshN * this.refNorm);
+
+    // Background gate: a near-uniform patch cannot be the object even if NCC
+    // scores high. Stops the bbox from jumping onto sky/wall/floor when the
+    // object leaves frame. Blur preserves overall std so blurry objects pass.
+    const isBackground = freshN < this.minPatchNorm;
+
+    // Commit decision uses the LIVE-template score (peak.score) — that score
+    // tracks the object's current appearance through blur and gradual change,
+    // unlike refScore which collapses against blur on a sharp frozen template.
+    const liveScore = peak.score;
+    const reject = isBackground || liveScore < LIVE_CONFIDENT_NCC || refScore < REF_LOST_NCC;
+    if (reject) {
+      this.lostFrames++;
+      if (this.lostFrames > MAX_LOST_FRAMES) return null;
+      return { bbox: this.bbox, center: { cx: this.bbox.x + this.tw / 2, cy: this.bbox.y + this.th / 2 }, score: refScore };
     }
-    // Recompute norm after blending.
-    let s = 0;
-    for (let i = 0; i < this.template.length; i++) s += this.template[i] * this.template[i];
-    this.templateNorm = Math.sqrt(s) || 1;
+
+    this.bbox = { x: newX, y: newY, w: this.tw, h: this.th };
+    this.lostFrames = 0;
+
+    // Only adapt the live template when we're confident — otherwise the
+    // template drifts onto whatever junk got matched and the lost gate
+    // (if we ever drop refTemplate) becomes useless.
+    if (refScore >= UPDATE_NCC) {
+      for (let i = 0; i < this.template.length; i++) {
+        this.template[i] = (1 - TEMPLATE_LR) * this.template[i] + TEMPLATE_LR * freshC[i];
+      }
+      let s = 0;
+      for (let i = 0; i < this.template.length; i++) s += this.template[i] * this.template[i];
+      this.templateNorm = Math.sqrt(s) || 1;
+    }
 
     return {
       bbox: this.bbox,
       center: { cx: newX + this.tw / 2, cy: newY + this.th / 2 },
+      score: refScore,
     };
   }
 
   dispose(): void {
     this.template = null;
+    this.refTemplate = null;
     this.bbox = null;
   }
 }

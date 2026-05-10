@@ -39,9 +39,10 @@ export function mountTracking(panel: HTMLElement): () => void {
   let cancelled = false;
   let stopped = false;
   let liveBbox: { x: number; y: number; w: number; h: number } | null = null;
+  let lastLost = false;
   let tracker: Tracker | null = null;
 
-  // Live overlay painter — draws the currently-tracked bbox in green.
+  // Live overlay painter — green when tracking, solid red when lost.
   setOverlayPainter((ctx, dw, dh) => {
     if (!liveBbox) return;
     const s = getState();
@@ -49,16 +50,17 @@ export function mountTracking(panel: HTMLElement): () => void {
     const br = origToDisp(liveBbox.x + liveBbox.w, liveBbox.y + liveBbox.h, s, dw, dh);
     const cx = (tl.x + br.x) / 2;
     const cy = (tl.y + br.y) / 2;
+    const color = lastLost ? '#ef4444' : '#a3e635';
     ctx.save();
-    // Bright lime — high-contrast against the red axes and most footage.
-    ctx.strokeStyle = '#a3e635';
+    ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-    // White centre dot with lime ring for unambiguous centre-of-bbox readout.
-    ctx.fillStyle = '#a3e635';
-    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#0b0d10';
-    ctx.beginPath(); ctx.arc(cx, cy, 1.6, 0, Math.PI * 2); ctx.fill();
+    if (!lastLost) {
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0b0d10';
+      ctx.beginPath(); ctx.arc(cx, cy, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
   });
 
@@ -90,6 +92,7 @@ export function mountTracking(panel: HTMLElement): () => void {
       t: startFrame / fps,
       cxPx: s0.bbox.x + s0.bbox.w / 2,
       cyPx: s0.bbox.y + s0.bbox.h / 2,
+      lost: false,
     }];
     liveBbox = { ...s0.bbox };
     const trackedBboxes = new Map<number, { x: number; y: number; w: number; h: number }>();
@@ -118,11 +121,15 @@ export function mountTracking(panel: HTMLElement): () => void {
       const upd = tracker.update(frame.pixels);
       if (upd) {
         liveBbox = upd.bbox;
+        lastLost = false;
         trackedBboxes.set(i, { ...upd.bbox });
-        samples.push({ idx: i, t: i / fps, cxPx: upd.center.cx, cyPx: upd.center.cy });
+        samples.push({ idx: i, t: i / fps, cxPx: upd.center.cx, cyPx: upd.center.cy, lost: false });
       } else {
+        // Keep the last known bbox visible (don't blank it) so the red LOST
+        // overlay has something to draw on.
+        lastLost = true;
         lost++;
-        samples.push({ idx: i, t: i / fps, cxPx: null, cyPx: null });
+        samples.push({ idx: i, t: i / fps, cxPx: null, cyPx: null, lost: true });
       }
 
       // Drive UI: update status + frameIdx, and render the canvas directly from
@@ -154,8 +161,7 @@ export function mountTracking(panel: HTMLElement): () => void {
         status: '',
         records: [],
         trackedBboxes: null,
-        startFrame: null,
-        frameIdx: 0,
+        frameIdx: startFrame,
         phase: 'navigate',
       });
       return;

@@ -31,6 +31,7 @@ struct U { scale: vec2f, offset: vec2f };
 `;
 
 type GpuState = {
+  canvas: HTMLCanvasElement;
   device: GPUDevice;
   ctx: GPUCanvasContext;
   format: string;
@@ -44,7 +45,14 @@ type GpuState = {
 let gpu: GpuState | null = null;
 
 async function ensureGpu(canvas: HTMLCanvasElement): Promise<GpuState | null> {
-  if (gpu) return gpu;
+  // Rebuild when the target canvas is swapped out (panel remount, restart, etc).
+  // The cached GPUCanvasContext is bound to the original canvas; reusing it
+  // renders into a detached element and the visible canvas stays blank.
+  if (gpu && gpu.canvas === canvas) return gpu;
+  if (gpu) {
+    gpu.vbo?.destroy?.();
+    gpu = null;
+  }
   const device = await getDevice();
   if (!device) return null;
   const ctx: any = canvas.getContext('webgpu');
@@ -70,7 +78,7 @@ async function ensureGpu(canvas: HTMLCanvasElement): Promise<GpuState | null> {
     layout: pipeline.getBindGroupLayout(0),
     entries: [{ binding: 0, resource: { buffer: ubo } }],
   });
-  gpu = { device, ctx, format, pipeline, ubo, bindGroup, vboCap: 0 };
+  gpu = { canvas, device, ctx, format, pipeline, ubo, bindGroup, vboCap: 0 };
   return gpu;
 }
 

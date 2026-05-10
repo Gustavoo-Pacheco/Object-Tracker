@@ -6,7 +6,7 @@
 
 import type { TrackRecord } from './state';
 
-export type Sample = { idx: number; t: number; cxPx: number | null; cyPx: number | null };
+export type Sample = { idx: number; t: number; cxPx: number | null; cyPx: number | null; lost: boolean };
 export type Smoothing = 'none' | 'ma5' | 'ma7' | 'sg5';
 
 // ── Smoothing kernels ──────────────────────────────────────────
