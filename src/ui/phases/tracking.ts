@@ -10,9 +10,9 @@
 //        - yield to event loop
 //   4. Hand raw samples to the post-processor, which writes records.
 
-import { getState, setState, triggerRender } from '../../state';
+import { getState, setState } from '../../state';
 import { setOverlayPainter, clearOverlayPainter } from '../overlay';
-import { origToDisp } from '../canvas';
+import { origToDisp, render } from '../canvas';
 import { Tracker } from '../../cv/tracker';
 import { readFrame } from '../../video/frames';
 import type { Sample } from '../../postprocess';
@@ -28,13 +28,16 @@ export function mountTracking(panel: HTMLElement): () => void {
     </div>
     <div class="phase-actions">
       <button id="track-cancel" class="secondary">${t('tracking.cancel')}</button>
+      <button id="track-stop" class="secondary">${t('tracking.stop')}</button>
     </div>
   `;
   const fill = panel.querySelector('#prog-fill') as HTMLElement;
   const text = panel.querySelector('#prog-text') as HTMLElement;
   const cancelBtn = panel.querySelector('#track-cancel') as HTMLButtonElement;
+  const stopBtn = panel.querySelector('#track-stop') as HTMLButtonElement;
 
   let cancelled = false;
+  let stopped = false;
   let liveBbox: { x: number; y: number; w: number; h: number } | null = null;
   let tracker: Tracker | null = null;
 
@@ -60,6 +63,7 @@ export function mountTracking(panel: HTMLElement): () => void {
   });
 
   cancelBtn.addEventListener('click', () => { cancelled = true; });
+  stopBtn.addEventListener('click', () => { stopped = true; });
 
   void run();
 
@@ -68,6 +72,7 @@ export function mountTracking(panel: HTMLElement): () => void {
     if (!s0.video || !s0.bbox) { abort('missing video or bbox'); return; }
     const { fps, totalFrames } = s0.video;
     const startFrame = s0.startFrame ?? 0;
+    const stride = Math.max(1, s0.frameStride | 0);
     const video = document.getElementById('src') as HTMLVideoElement;
 
     // Initial frame.
@@ -87,28 +92,46 @@ export function mountTracking(panel: HTMLElement): () => void {
       cyPx: s0.bbox.y + s0.bbox.h / 2,
     }];
     liveBbox = { ...s0.bbox };
+    const trackedBboxes = new Map<number, { x: number; y: number; w: number; h: number }>();
+    trackedBboxes.set(startFrame, { ...s0.bbox });
+    const stage = document.getElementById('stage') as HTMLCanvasElement;
+    // rAF-debounce the in-tracking preview. The tracking loop can iterate
+    // faster than the display refresh, and we don't need to paint every
+    // intermediate frame — just whatever is current at the next vsync.
+    let rafPending = false;
+    const schedulePreview = (): void => {
+      if (rafPending) return;
+      rafPending = true;
+      requestAnimationFrame(() => {
+        rafPending = false;
+        render(stage, video, getState());
+      });
+    };
 
-    const total = totalFrames - 1 - startFrame;
+    const total = Math.max(0, Math.floor((totalFrames - 1 - startFrame) / stride));
     let processed = 0;
     let lost = 0;
 
-    for (let i = startFrame + 1; i < totalFrames; i++) {
-      if (cancelled) break;
+    for (let i = startFrame + stride; i < totalFrames; i += stride) {
+      if (cancelled || stopped) break;
       const frame = await readFrame(video, i, fps);
       const upd = tracker.update(frame.pixels);
       if (upd) {
         liveBbox = upd.bbox;
+        trackedBboxes.set(i, { ...upd.bbox });
         samples.push({ idx: i, t: i / fps, cxPx: upd.center.cx, cyPx: upd.center.cy });
       } else {
         lost++;
         samples.push({ idx: i, t: i / fps, cxPx: null, cyPx: null });
       }
 
-      // Drive UI: scrub video frame index so the canvas reflects current frame,
-      // and update progress.
+      // Drive UI: update status + frameIdx, and render the canvas directly from
+      // the just-seeked <video> element. We DO NOT route through the FrameCache
+      // here — it would race with readFrame on the same video element, causing
+      // visible frames to jump forward and backward during tracking.
       processed++;
       setState({ frameIdx: i, status: t('status.tracking', { done: processed, total }) });
-      triggerRender();
+      schedulePreview();
       const pct = Math.round((processed / total) * 100);
       fill.style.width = `${pct}%`;
       text.textContent = `${processed} / ${total}  ·  ${t('tracking.lost')}: ${lost}`;
@@ -119,7 +142,31 @@ export function mountTracking(panel: HTMLElement): () => void {
 
     tracker.dispose();
     tracker = null;
-    setState({ status: t('status.done'), phase: 'done' });
+
+    if (cancelled) {
+      const plotMount = document.getElementById('plot');
+      if (plotMount) plotMount.innerHTML = '';
+      const tableBody = document.getElementById('table-body');
+      if (tableBody) tableBody.innerHTML = '';
+      const tableEmpty = document.getElementById('table-empty');
+      if (tableEmpty) tableEmpty.style.display = '';
+      setState({
+        status: '',
+        records: [],
+        trackedBboxes: null,
+        startFrame: null,
+        frameIdx: 0,
+        phase: 'navigate',
+      });
+      return;
+    }
+
+    setState({
+      status: t('status.done'),
+      trackedBboxes,
+      frameIdx: startFrame,
+      phase: 'done',
+    });
     setRawSamples(samples);
   }
 

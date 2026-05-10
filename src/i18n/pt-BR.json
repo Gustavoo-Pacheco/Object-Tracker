@@ -27,6 +27,7 @@
   "setup.hint":    "Selecione as ferramentas na barra para configurar cada parâmetro.",
   "setup.not_set": "—",
   "setup.run":     "Iniciar Rastreamento",
+  "setup.choose_frame": "Escolher outro frame",
 
   "phase2.title":       "Origem (0,0)",
   "phase2.instruction": "Clique no ponto que será a origem do sistema de coordenadas.",
@@ -51,6 +52,7 @@
 
   "tracking.title":   "Rastreando",
   "tracking.cancel":  "Cancelar",
+  "tracking.stop":    "Parar",
   "tracking.lost":    "Perdidos",
   "tracking.elapsed": "Tempo decorrido",
 
@@ -83,7 +85,11 @@
   "col.vx":   "vx (m/s)",
   "col.vy":   "vy (m/s)",
 
-  "export.download": "Baixar CSV",
+  "export.download":      "Baixar CSV",
+  "export.frequency":     "Frequência de exportação",
+  "export.every_frame":   "Todo frame",
+  "export.every_n":       "Exportar dados a cada N frames",
+  "export.unit":          "frames",
 
   "errors.video_load":    "Falha ao carregar vídeo",
   "errors.opencv_load":   "Falha ao carregar OpenCV",

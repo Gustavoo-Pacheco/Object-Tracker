@@ -3,7 +3,7 @@ import { dispToOrig } from '../canvas';
 import { setOverlayPainter, clearOverlayPainter } from '../overlay';
 import { t } from '../../i18n';
 
-const RED = '#ef4444';
+const RED = '#ff0000';
 
 type Pt = { x: number; y: number };
 

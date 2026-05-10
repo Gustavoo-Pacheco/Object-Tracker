@@ -81,8 +81,8 @@ function drawAxes(
   if (!s.origin || !s.video) return;
   const { x: ox, y: oy } = origToDisp(s.origin.x, s.origin.y, s, dw, dh);
 
-  const stroke = 'rgba(239, 68, 68, 0.75)';
-  const solid  = '#ef4444';
+  const stroke = '#ff0000';
+  const solid  = '#ff0000';
 
   ctx.save();
 
@@ -110,8 +110,8 @@ function drawScaleLine(ctx: CanvasRenderingContext2D, s: AppState, dw: number, d
   const a = origToDisp(s.scalePts[0].x, s.scalePts[0].y, s, dw, dh);
   const b = origToDisp(s.scalePts[1].x, s.scalePts[1].y, s, dw, dh);
   ctx.save();
-  ctx.strokeStyle = '#f472b6';
-  ctx.fillStyle = '#f472b6';
+  ctx.strokeStyle = '#1d4ed8';
+  ctx.fillStyle = '#1d4ed8';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
@@ -127,8 +127,12 @@ function drawBbox(ctx: CanvasRenderingContext2D, s: AppState, dw: number, dh: nu
   const br = origToDisp(s.bbox.x + s.bbox.w, s.bbox.y + s.bbox.h, s, dw, dh);
   ctx.save();
   ctx.strokeStyle = '#008000';
+  ctx.fillStyle = '#008000';
   ctx.lineWidth = 2;
   ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  const cx = (tl.x + br.x) / 2;
+  const cy = (tl.y + br.y) / 2;
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -219,25 +223,25 @@ export function attachZoomPan(canvas: HTMLCanvasElement): void {
         zoomAt(dw / 2, dh / 2, 1 / 1.15, dw, dh);
         break;
       case 'ArrowLeft': case 'j': case 'J': {
-        if (e.key === 'ArrowLeft' && s.phase === 'navigate') break;
+        if (e.key === 'ArrowLeft' && (s.phase === 'navigate' || s.phase === 'done')) break;
         const pan = clampPan(s.pan.x - panStep.x, s.pan.y, s.zoom, s.video.width, s.video.height);
         setState({ pan });
         break;
       }
       case 'ArrowRight': case 'l': case 'L': {
-        if (e.key === 'ArrowRight' && s.phase === 'navigate') break;
+        if (e.key === 'ArrowRight' && (s.phase === 'navigate' || s.phase === 'done')) break;
         const pan = clampPan(s.pan.x + panStep.x, s.pan.y, s.zoom, s.video.width, s.video.height);
         setState({ pan });
         break;
       }
       case 'ArrowUp': case 'i': case 'I': {
-        if (e.key === 'ArrowUp' && s.phase === 'navigate') break;
+        if (e.key === 'ArrowUp' && (s.phase === 'navigate' || s.phase === 'done')) break;
         const pan = clampPan(s.pan.x, s.pan.y - panStep.y, s.zoom, s.video.width, s.video.height);
         setState({ pan });
         break;
       }
       case 'ArrowDown': case 'k': case 'K': {
-        if (e.key === 'ArrowDown' && s.phase === 'navigate') break;
+        if (e.key === 'ArrowDown' && (s.phase === 'navigate' || s.phase === 'done')) break;
         const pan = clampPan(s.pan.x, s.pan.y + panStep.y, s.zoom, s.video.width, s.video.height);
         setState({ pan });
         break;

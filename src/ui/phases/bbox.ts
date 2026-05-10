@@ -85,8 +85,10 @@ export function mountBbox(canvas: HTMLCanvasElement, cursorUi: HTMLElement): () 
     const h = Math.abs(p2.y - p1.y);
     ctx.save();
     ctx.strokeStyle = GREEN;
+    ctx.fillStyle = GREEN;
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, w, h);
+    ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, 3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   });
 

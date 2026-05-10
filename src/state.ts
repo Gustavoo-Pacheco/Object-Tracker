@@ -20,7 +20,9 @@ export type AppState = {
   metresPerPixel: number | null;
   bbox: { x: number; y: number; w: number; h: number } | null;
   startFrame: number | null;
+  frameStride: number;
   records: TrackRecord[];
+  trackedBboxes: Map<number, { x: number; y: number; w: number; h: number }> | null;
   status: string;
 };
 
@@ -35,7 +37,9 @@ const state: AppState = {
   metresPerPixel: null,
   bbox: null,
   startFrame: null,
+  frameStride: 1,
   records: [],
+  trackedBboxes: null,
   status: 'Upload a video to begin',
 };
 

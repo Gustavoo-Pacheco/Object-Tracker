@@ -1,13 +1,19 @@
 // WebGPU polyline trajectory plot.
 //
 // Renders (x, y) world-metre coords as a line-strip into a <canvas> element.
-// Uses a tiny vertex buffer (rebuilt per draw) and a single-pipeline pass.
-// If WebGPU is not available, falls back to a Canvas2D polyline.
+// The view is fixed to the full image extent (passed in by the caller) and
+// drawn with a preserved aspect ratio — 1 metre on X equals 1 metre on Y in
+// pixels. No auto-zoom: the plot mirrors the image's coordinate system.
 
 import { getDevice } from './device';
 import type { TrackRecord } from '../state';
 
 type Ctx2D = CanvasRenderingContext2D;
+
+export type PlotView = {
+  minX: number; maxX: number;
+  minY: number; maxY: number;
+};
 
 const SHADER = /* wgsl */`
 struct U { scale: vec2f, offset: vec2f };
@@ -68,44 +74,108 @@ async function ensureGpu(canvas: HTMLCanvasElement): Promise<GpuState | null> {
   return gpu;
 }
 
-function bounds(records: TrackRecord[]): { minX: number; maxX: number; minY: number; maxY: number } | null {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const r of records) {
-    const x = r[2], y = r[3];
-    if (x == null || y == null) continue;
-    if (x < minX) minX = x; if (x > maxX) maxX = x;
-    if (y < minY) minY = y; if (y > maxY) maxY = y;
-  }
-  if (!isFinite(minX)) return null;
-  if (minX === maxX) { minX -= 0.5; maxX += 0.5; }
-  if (minY === maxY) { minY -= 0.5; maxY += 0.5; }
-  return { minX, maxX, minY, maxY };
+// Fit the world view into the canvas with equal X/Y scale (letterbox).
+// Returns the per-axis scale (in NDC units per world metre) and the NDC
+// offset that places (cx, cy) at NDC origin.
+function fit(view: PlotView, w: number, h: number): {
+  sx: number; sy: number;        // world → NDC
+  cx: number; cy: number;        // world centre
+  pxPerM: number;                // shared pixel-per-metre (for axes)
+} {
+  const Ww = view.maxX - view.minX;
+  const Wh = view.maxY - view.minY;
+  const pxPerM = Math.min(w / Ww, h / Wh);
+  // NDC half-extent is 1, so scale = pxPerM / (canvasPx / 2).
+  const sx = (pxPerM * 2) / w;
+  const sy = (pxPerM * 2) / h;
+  const cx = (view.minX + view.maxX) / 2;
+  const cy = (view.minY + view.maxY) / 2;
+  return { sx, sy, cx, cy, pxPerM };
 }
 
-function pad(v: { minX: number; maxX: number; minY: number; maxY: number }): typeof v {
-  const padX = (v.maxX - v.minX) * 0.08;
-  const padY = (v.maxY - v.minY) * 0.08;
-  return { minX: v.minX - padX, maxX: v.maxX + padX, minY: v.minY - padY, maxY: v.maxY + padY };
+// World (x, y) → canvas pixel (px from top-left). Axes-canvas helper.
+function worldToPx(
+  x: number, y: number,
+  view: PlotView, w: number, h: number,
+): { x: number; y: number } {
+  const { sx, sy, cx, cy } = fit(view, w, h);
+  const ndcX = (x - cx) * sx;
+  const ndcY = (y - cy) * sy;
+  return { x: (ndcX * 0.5 + 0.5) * w, y: (1 - (ndcY * 0.5 + 0.5)) * h };
 }
 
-function drawAxes(ctx: Ctx2D, w: number, h: number, b: ReturnType<typeof pad>): void {
+// Pick a "nice" tick interval (1/2/5 × 10^n) given roughly N ticks per range.
+function niceStep(range: number, target: number): number {
+  if (range <= 0 || !isFinite(range)) return 1;
+  const raw = range / Math.max(1, target);
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / pow;
+  const step = n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10;
+  return step * pow;
+}
+
+function drawAxes(ctx: Ctx2D, w: number, h: number, view: PlotView): void {
   ctx.clearRect(0, 0, w, h);
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+
+  const Ww = view.maxX - view.minX;
+  const Wh = view.maxY - view.minY;
+  const stepX = niceStep(Ww, 8);
+  const stepY = niceStep(Wh, 6);
+
+  // Grid.
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let i = 1; i < 5; i++) {
-    const y = (i / 5) * h;
-    ctx.moveTo(0, y); ctx.lineTo(w, y);
-    const x = (i / 5) * w;
-    ctx.moveTo(x, 0); ctx.lineTo(x, h);
+  const x0 = Math.ceil(view.minX / stepX) * stepX;
+  for (let x = x0; x <= view.maxX + 1e-9; x += stepX) {
+    const p = worldToPx(x, view.minY, view, w, h).x;
+    ctx.moveTo(p, 0); ctx.lineTo(p, h);
+  }
+  const y0 = Math.ceil(view.minY / stepY) * stepY;
+  for (let y = y0; y <= view.maxY + 1e-9; y += stepY) {
+    const p = worldToPx(view.minX, y, view, w, h).y;
+    ctx.moveTo(0, p); ctx.lineTo(w, p);
   }
   ctx.stroke();
+
+  // World-origin axes (x=0, y=0) if inside view.
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1;
+  if (view.minX <= 0 && 0 <= view.maxX) {
+    const p = worldToPx(0, view.minY, view, w, h).x;
+    ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, h); ctx.stroke();
+  }
+  if (view.minY <= 0 && 0 <= view.maxY) {
+    const p = worldToPx(view.minX, 0, view, w, h).y;
+    ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(w, p); ctx.stroke();
+  }
+
+  // Tick labels.
   ctx.fillStyle = 'rgba(138, 147, 164, 0.85)';
   ctx.font = '10px ui-monospace, monospace';
+  const decimals = Math.max(0, -Math.floor(Math.log10(stepX)));
+  const decimalsY = Math.max(0, -Math.floor(Math.log10(stepY)));
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  for (let x = x0; x <= view.maxX + 1e-9; x += stepX) {
+    const p = worldToPx(x, view.minY, view, w, h).x;
+    if (p < 14 || p > w - 14) continue;
+    ctx.fillText(x.toFixed(decimals), p, h - 2);
+  }
   ctx.textAlign = 'left';
-  ctx.fillText(`x: ${b.minX.toFixed(2)} → ${b.maxX.toFixed(2)} m`, 6, h - 6);
+  ctx.textBaseline = 'middle';
+  for (let y = y0; y <= view.maxY + 1e-9; y += stepY) {
+    const p = worldToPx(view.minX, y, view, w, h).y;
+    if (p < 8 || p > h - 8) continue;
+    ctx.fillText(y.toFixed(decimalsY), 4, p);
+  }
+
+  // Corner extent label.
+  ctx.fillStyle = 'rgba(138, 147, 164, 0.6)';
   ctx.textAlign = 'right';
-  ctx.fillText(`y: ${b.minY.toFixed(2)} → ${b.maxY.toFixed(2)} m`, w - 6, 12);
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(`${Ww.toFixed(2)} × ${Wh.toFixed(2)} m`, w - 4, h - 2);
 }
 
 // Public entry — renders WebGPU strip + Canvas2D axes.
@@ -113,6 +183,7 @@ export async function renderPlot(
   glCanvas: HTMLCanvasElement,
   axesCanvas: HTMLCanvasElement,
   records: TrackRecord[],
+  view: PlotView,
 ): Promise<void> {
   const w = glCanvas.clientWidth || 320;
   const h = glCanvas.clientHeight || 200;
@@ -124,18 +195,11 @@ export async function renderPlot(
     if (c.height !== th) c.height = th;
   }
 
-  const b0 = bounds(records);
   const ctx2d = axesCanvas.getContext('2d')!;
-  if (!b0) {
-    ctx2d.clearRect(0, 0, axesCanvas.width, axesCanvas.height);
-    return;
-  }
-  const b = pad(b0);
-  drawAxes(ctx2d, axesCanvas.width, axesCanvas.height, b);
+  drawAxes(ctx2d, axesCanvas.width, axesCanvas.height, view);
 
-  const verts = recordVerts(records, b);
+  const verts = recordVerts(records, view, glCanvas.width, glCanvas.height);
 
-  // Try WebGPU.
   const g = await ensureGpu(glCanvas);
   if (g && verts.length >= 4) {
     const byteSize = verts.byteLength;
@@ -146,7 +210,7 @@ export async function renderPlot(
     }
     g.device.queue.writeBuffer(g.vbo, 0, verts.buffer, verts.byteOffset, byteSize);
 
-    // Identity transform — verts are already NDC.
+    // Verts are already NDC.
     const u = new Float32Array([1, 1, 0, 0]);
     g.device.queue.writeBuffer(g.ubo, 0, u.buffer);
 
@@ -183,16 +247,15 @@ export async function renderPlot(
   }
 }
 
-// Records → NDC vertex pairs, skipping null gaps with a degenerate split.
-function recordVerts(records: TrackRecord[], b: ReturnType<typeof pad>): Float32Array {
-  const sx = 2 / (b.maxX - b.minX);
-  const sy = 2 / (b.maxY - b.minY);
+// Records → NDC vertex pairs using the fixed view (aspect-preserving fit).
+function recordVerts(records: TrackRecord[], view: PlotView, w: number, h: number): Float32Array {
+  const { sx, sy, cx, cy } = fit(view, w, h);
   const out: number[] = [];
   for (const r of records) {
     const x = r[2], y = r[3];
     if (x == null || y == null) continue;
-    out.push((x - b.minX) * sx - 1);
-    out.push((y - b.minY) * sy - 1);
+    out.push((x - cx) * sx);
+    out.push((y - cy) * sy);
   }
   return new Float32Array(out);
 }

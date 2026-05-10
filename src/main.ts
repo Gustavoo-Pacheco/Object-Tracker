@@ -12,6 +12,7 @@ import { mountScale } from './ui/phases/scale';
 import { mountBbox } from './ui/phases/bbox';
 import { mountTracking } from './ui/phases/tracking';
 import { mountResults } from './ui/results';
+import { mountSplitters } from './ui/splitters';
 import { t } from './i18n';
 
 applyDom();
@@ -26,10 +27,10 @@ const navBar      = document.getElementById('nav-bar')!;
 const phaseUi     = document.getElementById('phase-ui')!;
 const cursorUi    = document.getElementById('cursor-ui')!;
 
-const toolAxisBtn  = document.getElementById('tool-axis')  as HTMLButtonElement;
-const toolScaleBtn = document.getElementById('tool-scale') as HTMLButtonElement;
-const toolBboxBtn  = document.getElementById('tool-bbox')  as HTMLButtonElement;
-const runBtn       = document.getElementById('btn-run')    as HTMLButtonElement;
+const toolAxisBtn  = document.getElementById('tool-axis')        as HTMLButtonElement;
+const toolScaleBtn = document.getElementById('tool-scale')       as HTMLButtonElement;
+const toolBboxBtn  = document.getElementById('tool-bbox')        as HTMLButtonElement;
+const resetFrameBtn = document.getElementById('btn-reset-frame') as HTMLButtonElement;
 
 const cache = new FrameCache();
 
@@ -52,6 +53,10 @@ let currentPhase: Phase = 'idle';
 let unmountCurrent: (() => void) | undefined;
 
 const TOOL_PHASES = new Set<Phase>(['setup', 'origin', 'scale', 'bbox']);
+const SETUP_PANEL_PHASES = new Set<Phase>(['navigate', 'setup', 'origin', 'scale', 'bbox']);
+const NAV_BAR_PHASES = new Set<Phase>(['navigate', 'done']);
+
+let unmountNavBar: (() => void) | undefined;
 
 // Setup panel stays mounted for the entire setup/origin/scale/bbox group.
 // Tool phases (origin/scale/bbox) additionally mount their cursor UI over the canvas.
@@ -87,6 +92,7 @@ function renderSetupPanel(s: AppState): void {
   `;
 
   phaseUi.querySelector('#run-from-setup')?.addEventListener('click', () => {
+    if (getState().frameStride !== 1) setState({ frameStride: 1 });
     setState({ phase: 'tracking' });
   });
 }
@@ -94,7 +100,7 @@ function renderSetupPanel(s: AppState): void {
 function mountSetupGroup(): void {
   renderSetupPanel(getState());
   const unsub = subscribe((s) => {
-    if (TOOL_PHASES.has(s.phase)) renderSetupPanel(s);
+    if (SETUP_PANEL_PHASES.has(s.phase)) renderSetupPanel(s);
   });
   unmountSetup = () => { unsub(); phaseUi.innerHTML = ''; };
 }
@@ -115,11 +121,17 @@ subscribe((s) => {
   else         dropOverlay.classList.remove('hidden');
 
   // Enable/disable toolbar tool buttons
-  const toolsEnabled = TOOL_PHASES.has(s.phase);
+  const toolsEnabled = TOOL_PHASES.has(s.phase) || s.phase === 'navigate';
   toolAxisBtn.disabled  = !toolsEnabled;
   toolScaleBtn.disabled = !toolsEnabled;
   toolBboxBtn.disabled  = !toolsEnabled;
-  if (runBtn) runBtn.disabled = !(s.origin && s.metresPerPixel && s.bbox);
+  // Reset-frame button: visible whenever a video is loaded and we're past the
+  // initial navigate phase (i.e., the user has selected at least one tool).
+  if (resetFrameBtn) {
+    const showReset = !!s.video && s.phase !== 'navigate' && s.phase !== 'idle'
+      && s.phase !== 'tracking' && s.phase !== 'done';
+    resetFrameBtn.toggleAttribute('hidden', !showReset);
+  }
 
   // Active + done indicators on toolbar buttons
   toolAxisBtn.classList.toggle('active', s.phase === 'origin');
@@ -130,36 +142,49 @@ subscribe((s) => {
   toolBboxBtn.classList.toggle('done',  s.bbox !== null && s.phase !== 'bbox');
 
   if (s.phase !== currentPhase) {
-    const wasInSetupGroup = TOOL_PHASES.has(currentPhase);
-    const nowInSetupGroup = TOOL_PHASES.has(s.phase);
+    const wasInPanelGroup = SETUP_PANEL_PHASES.has(currentPhase);
+    const nowInPanelGroup = SETUP_PANEL_PHASES.has(s.phase);
+    const nowInToolGroup  = TOOL_PHASES.has(s.phase);
+    const wasInNavBar     = NAV_BAR_PHASES.has(currentPhase);
+    const nowInNavBar     = NAV_BAR_PHASES.has(s.phase);
     currentPhase = s.phase;
 
-    // Tear down previous non-setup-group phases
-    if (!wasInSetupGroup) {
+    // Tear down tracking/results panels when leaving them.
+    if (!wasInPanelGroup) {
       unmountCurrent?.();
       unmountCurrent = undefined;
     }
 
     // Mount/unmount the setup panel group as a whole
-    if (!wasInSetupGroup && nowInSetupGroup) {
+    if (!wasInPanelGroup && nowInPanelGroup) {
       mountSetupGroup();
-    } else if (wasInSetupGroup && !nowInSetupGroup) {
+    } else if (wasInPanelGroup && !nowInPanelGroup) {
       unmountSetupGroup();
       unmountCurrent?.();
       unmountCurrent = undefined;
     }
 
     // Mount per-tool cursor UI
-    if (nowInSetupGroup) {
+    if (nowInToolGroup) {
       unmountTool?.();
       unmountTool = undefined;
       if (s.phase === 'origin') unmountTool = mountOrigin(canvas, cursorUi);
       else if (s.phase === 'scale') unmountTool = mountScale(canvas, cursorUi);
       else if (s.phase === 'bbox') unmountTool = mountBbox(canvas, cursorUi);
+    } else {
+      unmountTool?.();
+      unmountTool = undefined;
+      cursorUi.setAttribute('hidden', '');
+      cursorUi.innerHTML = '';
     }
 
-    if (s.phase === 'navigate') {
-      unmountCurrent = mountNavigate(navBar, (_idx) => {});
+    // Nav bar lives across both 'navigate' and 'done' phases. Mount on entry
+    // to either, unmount when leaving the group.
+    if (!wasInNavBar && nowInNavBar) {
+      unmountNavBar = mountNavigate(navBar);
+    } else if (wasInNavBar && !nowInNavBar) {
+      unmountNavBar?.();
+      unmountNavBar = undefined;
     }
 
     if (s.phase === 'tracking') {
@@ -169,27 +194,44 @@ subscribe((s) => {
     }
   }
 
-  queueRender();
+  // Skip cache-driven render during 'tracking' — the tracking loop owns the
+  // <video> element (seeks it for each frame) and renders the canvas itself.
+  // Going through FrameCache here would race with readFrame() and cause the
+  // visible frames to jitter forward/backward.
+  if (s.phase !== 'tracking') queueRender();
 });
 
 subscribe((s) => { if (!s.video) cache.clear(); });
 
 attachZoomPan(canvas);
+mountSplitters();
 
 // ── Toolbar tool button clicks ────────────────────────────────
+function captureStartFrameIfNavigating(): { startFrame?: number } {
+  const cur = getState();
+  return cur.phase === 'navigate' ? { startFrame: cur.frameIdx } : {};
+}
 toolAxisBtn.addEventListener('click', () => {
-  setState({ origin: null, phase: 'origin' });
+  setState({ origin: null, phase: 'origin', ...captureStartFrameIfNavigating() });
 });
 toolScaleBtn.addEventListener('click', () => {
-  setState({ metresPerPixel: null, scalePts: null, phase: 'scale' });
+  setState({ metresPerPixel: null, scalePts: null, phase: 'scale', ...captureStartFrameIfNavigating() });
 });
 toolBboxBtn.addEventListener('click', () => {
-  setState({ bbox: null, phase: 'bbox' });
+  setState({ bbox: null, phase: 'bbox', ...captureStartFrameIfNavigating() });
 });
-if (runBtn) {
-  runBtn.addEventListener('click', () => {
-    const s = getState();
-    if (s.origin && s.metresPerPixel && s.bbox) setState({ phase: 'tracking' });
+if (resetFrameBtn) {
+  resetFrameBtn.addEventListener('click', () => {
+    setState({
+      phase: 'navigate',
+      origin: null,
+      scalePts: null,
+      metresPerPixel: null,
+      bbox: null,
+      startFrame: null,
+      records: [],
+      trackedBboxes: null,
+    });
   });
 }
 

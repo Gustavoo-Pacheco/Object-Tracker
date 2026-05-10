@@ -3,7 +3,7 @@ import { dispToOrig } from '../canvas';
 import { setOverlayPainter, clearOverlayPainter } from '../overlay';
 import { t } from '../../i18n';
 
-const RED = '#ef4444';
+const BLUE = '#1d4ed8';
 
 type Pt = { x: number; y: number };
 
@@ -73,8 +73,8 @@ export function mountScale(canvas: HTMLCanvasElement, cursorUi: HTMLElement): ()
 
   setOverlayPainter((ctx) => {
     ctx.save();
-    ctx.strokeStyle = RED;
-    ctx.fillStyle   = RED;
+    ctx.strokeStyle = BLUE;
+    ctx.fillStyle   = BLUE;
     ctx.lineWidth   = 1.5;
     if (pts.length >= 1) {
       ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, 4, 0, Math.PI * 2); ctx.fill();

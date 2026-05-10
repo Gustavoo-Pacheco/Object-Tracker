@@ -17,7 +17,7 @@
       </div>
       <div class="toolbar-right">
         <span id="cv-status" class="hint"></span>
-        <button id="btn-run" class="tool-btn" disabled data-i18n="setup.run">Iniciar Rastreamento</button>
+        <button id="btn-reset-frame" class="tool-btn accent-btn" hidden data-i18n="setup.choose_frame">Escolher outro frame</button>
       </div>
     </nav>
 
@@ -57,6 +57,8 @@
         <div id="nav-bar" hidden></div>
       </section>
 
+      <div class="splitter splitter-v" id="split-main" role="separator" aria-orientation="vertical" tabindex="0"></div>
+
       <aside id="panel">
         <div id="phase-ui"></div>
 
@@ -66,6 +68,8 @@
             <p class="plot-empty hint" data-i18n="plot.empty">Nenhum dado. Rastreie um vídeo para ver os resultados.</p>
           </div>
         </section>
+
+        <div class="splitter splitter-h" id="split-panel" role="separator" aria-orientation="horizontal" tabindex="0"></div>
 
         <section id="table-wrap">
           <h2 data-i18n="table.title">Dados</h2>

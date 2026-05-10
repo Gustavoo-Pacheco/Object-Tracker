@@ -4,7 +4,6 @@ import { clearVideo } from '../../video/loader';
 
 export function mountNavigate(
   bar: HTMLElement,
-  onConfirm: (idx: number) => void,
 ): () => void {
   const s = getState();
   if (!s.video) return () => {};
@@ -13,11 +12,12 @@ export function mountNavigate(
   const maxIdx = totalFrames - 1;
 
   bar.innerHTML = `
-    <input type="range" id="nav-scrub" min="0" max="${maxIdx}" value="0" />
+    <input type="range" id="nav-scrub" min="0" max="${maxIdx}" value="${s.frameIdx}" />
     <div class="nav-controls">
       <div class="jump-group">
         <button class="icon-btn" id="btn-back-step">«</button>
         <button class="icon-btn" id="btn-back-1">‹</button>
+        <button class="icon-btn" id="btn-play">▶</button>
         <div class="nav-step-wrap">
           <span class="nav-step-label">${t('phase1.step_label')}</span>
           <input type="number" id="nav-step" min="1" max="999" value="10"
@@ -31,7 +31,6 @@ export function mountNavigate(
         <span class="nav-sep">·</span>
         <span class="nav-frame tabular" id="nav-frame-num">0 / ${maxIdx}</span>
       </div>
-      <button id="nav-confirm" class="nav-confirm-btn">${t('phase1.confirm')}</button>
     </div>
   `;
 
@@ -53,29 +52,54 @@ export function mountNavigate(
     setState({ frameIdx: next });
   }
 
-  function confirmCurrent(): void {
-    const cur = getState();
-    setState({ startFrame: cur.frameIdx, phase: 'setup' });
-    onConfirm(cur.frameIdx);
-  }
-
   bar.querySelector('#btn-back-step')!.addEventListener('click', () => jump(-getStep()));
   bar.querySelector('#btn-back-1')!   .addEventListener('click', () => jump(-1));
   bar.querySelector('#btn-fwd-1')!    .addEventListener('click', () => jump(1));
   bar.querySelector('#btn-fwd-step')! .addEventListener('click', () => jump(getStep()));
-  scrub.addEventListener('input', () => setState({ frameIdx: parseInt(scrub.value, 10) }));
-  bar.querySelector('#nav-confirm')!  .addEventListener('click', confirmCurrent);
+  scrub.addEventListener('input', () => {
+    stopPlayback();
+    setState({ frameIdx: parseInt(scrub.value, 10) });
+  });
+
+  // ── Play / pause ────────────────────────────────────────────
+  const playBtn = bar.querySelector('#btn-play') as HTMLButtonElement;
+  let playTimer: number | null = null;
+  function isPlaying(): boolean { return playTimer !== null; }
+  function setPlayBtn(): void { playBtn.textContent = isPlaying() ? '⏸' : '▶'; }
+  function stopPlayback(): void {
+    if (playTimer !== null) { clearTimeout(playTimer); playTimer = null; }
+    setPlayBtn();
+  }
+  function startPlayback(): void {
+    const cur0 = getState();
+    if (!cur0.video) return;
+    if (cur0.frameIdx >= cur0.video.totalFrames - 1) setState({ frameIdx: 0 });
+    const fps = cur0.video.fps;
+    const tick = (): void => {
+      const cur = getState();
+      if (!cur.video) { stopPlayback(); return; }
+      const next = cur.frameIdx + 1;
+      if (next >= cur.video.totalFrames) { stopPlayback(); return; }
+      setState({ frameIdx: next });
+      playTimer = window.setTimeout(tick, 1000 / fps);
+    };
+    playTimer = window.setTimeout(tick, 1000 / fps);
+    setPlayBtn();
+  }
+  playBtn.addEventListener('click', () => { isPlaying() ? stopPlayback() : startPlayback(); });
 
   const keyHandler = (e: KeyboardEvent): void => {
-    if (getState().phase !== 'navigate') return;
+    const phase = getState().phase;
+    if (phase !== 'navigate' && phase !== 'done') return;
     if ((e.target as HTMLElement).tagName === 'INPUT') return;
     switch (e.key) {
-      case 'ArrowLeft':  case 'a': case 'A': e.preventDefault(); jump(-1);         break;
-      case 'ArrowRight': case 'd': case 'D': e.preventDefault(); jump(1);          break;
-      case 'ArrowUp':    case 'w': case 'W': e.preventDefault(); jump(getStep());  break;
-      case 'ArrowDown':  case 's': case 'S': e.preventDefault(); jump(-getStep()); break;
-      case 'Enter': case ' ':                e.preventDefault(); confirmCurrent(); break;
-      case 'Escape':                         cancelToIdle();                        break;
+      case 'ArrowLeft':  case 'a': case 'A': e.preventDefault(); stopPlayback(); jump(-1);         break;
+      case 'ArrowRight': case 'd': case 'D': e.preventDefault(); stopPlayback(); jump(1);          break;
+      case 'ArrowUp':    case 'w': case 'W': e.preventDefault(); stopPlayback(); jump(getStep());  break;
+      case 'ArrowDown':  case 's': case 'S': e.preventDefault(); stopPlayback(); jump(-getStep()); break;
+      case ' ':                              e.preventDefault();
+                                             isPlaying() ? stopPlayback() : startPlayback();      break;
+      case 'Escape':                         if (phase === 'navigate') cancelToIdle();             break;
     }
   };
   window.addEventListener('keydown', keyHandler);
@@ -89,6 +113,7 @@ export function mountNavigate(
   });
 
   return () => {
+    stopPlayback();
     window.removeEventListener('keydown', keyHandler);
     unsub();
     bar.setAttribute('hidden', '');
