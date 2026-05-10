@@ -3,7 +3,7 @@
 
 const STORE_KEY = 'tracker.layout.v1';
 
-type Layout = { panelW?: number; tableH?: number };
+type Layout = { panelW?: number; tableH?: number; phaseH?: number };
 
 function load(): Layout {
   try { return JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); }
@@ -18,12 +18,32 @@ export function mountSplitters(): void {
   const main = document.querySelector('main') as HTMLElement;
   const panel = document.getElementById('panel') as HTMLElement;
   const tableWrap = document.getElementById('table-wrap') as HTMLElement;
+  const phaseUi = document.getElementById('phase-ui') as HTMLElement;
   const splitMain = document.getElementById('split-main') as HTMLElement;
   const splitPanel = document.getElementById('split-panel') as HTMLElement;
+  const splitPhase = document.getElementById('split-phase') as HTMLElement | null;
 
   const stored = load();
   if (stored.panelW) panel.style.width = `${clamp(stored.panelW, 240, window.innerWidth * 0.8)}px`;
   if (stored.tableH) tableWrap.style.flexBasis = `${clamp(stored.tableH, 60, window.innerHeight * 0.8)}px`;
+  const storedPhaseH = stored.phaseH;
+
+  // Apply stored size and show splitter only while phase-ui has content.
+  // When empty (idle state), collapse phase-ui to 0 so "Trajetória" sits at
+  // the top of the panel instead of leaving a phantom gap.
+  if (splitPhase) {
+    const updatePhaseSplitter = (): void => {
+      const empty = phaseUi.childElementCount === 0;
+      splitPhase.toggleAttribute('hidden', empty);
+      if (empty) {
+        phaseUi.style.flexBasis = '';
+      } else if (storedPhaseH) {
+        phaseUi.style.flexBasis = `${clamp(storedPhaseH, 60, window.innerHeight * 0.8)}px`;
+      }
+    };
+    updatePhaseSplitter();
+    new MutationObserver(updatePhaseSplitter).observe(phaseUi, { childList: true });
+  }
 
   // Vertical splitter (panel width)
   attachDrag(splitMain, 'col', (e, start) => {
@@ -40,6 +60,16 @@ export function mountSplitters(): void {
     tableWrap.style.flexBasis = `${next}px`;
     return next;
   }, () => tableWrap.clientHeight, (v) => save({ ...load(), tableH: v }));
+
+  // Horizontal splitter (phase-ui height inside panel)
+  if (splitPhase) {
+    attachDrag(splitPhase, 'row', (e, start) => {
+      const dy = e.clientY - start.clientY; // dragging down grows phase-ui
+      const next = clamp(start.size + dy, 60, panel.clientHeight - 140);
+      phaseUi.style.flexBasis = `${next}px`;
+      return next;
+    }, () => phaseUi.clientHeight, (v) => save({ ...load(), phaseH: v }));
+  }
 }
 
 function attachDrag(
@@ -80,6 +110,10 @@ function attachDrag(
     if (kind === 'col') {
       (handle.parentElement!.querySelector('#panel') as HTMLElement).style.width = '380px';
       onEnd(380);
+    } else if (handle.id === 'split-phase') {
+      const el = document.getElementById('phase-ui') as HTMLElement;
+      el.style.flexBasis = '';
+      onEnd(el.clientHeight);
     } else {
       (document.getElementById('table-wrap') as HTMLElement).style.flexBasis = '220px';
       onEnd(220);

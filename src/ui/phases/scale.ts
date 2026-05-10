@@ -112,6 +112,7 @@ export function mountScale(canvas: HTMLCanvasElement, cursorUi: HTMLElement): ()
 
   const keyHandler = (e: KeyboardEvent): void => {
     if (getState().phase !== 'scale') return;
+    if (e.key === 'Enter' && !confirmBtn.disabled) { e.preventDefault(); confirmBtn.click(); return; }
     if ((e.target as HTMLElement).tagName === 'INPUT') return;
     if (e.key === 'r' || e.key === 'R') (cursorUi.querySelector('#redo-scale') as HTMLButtonElement).click();
     if (e.key === 'Escape') setState({ phase: 'setup' });

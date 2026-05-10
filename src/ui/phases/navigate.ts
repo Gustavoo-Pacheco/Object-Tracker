@@ -41,6 +41,11 @@ export function mountNavigate(
   const frameNum  = bar.querySelector('#nav-frame-num')  as HTMLElement;
   const stepInput = bar.querySelector('#nav-step')       as HTMLInputElement;
 
+  // Typing-only: block scroll-wheel from changing the value, and select all
+  // contents on focus so the user can immediately overwrite the number.
+  stepInput.addEventListener('wheel', (e) => { (e.target as HTMLInputElement).blur(); }, { passive: true });
+  stepInput.addEventListener('focus', () => stepInput.select());
+
   function getStep(): number {
     return Math.max(1, parseInt(stepInput.value, 10) || 10);
   }

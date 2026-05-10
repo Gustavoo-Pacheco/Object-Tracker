@@ -1,5 +1,5 @@
 {
-  "app.title": "Object Tracker",
+  "app.title": "Rastreador Modelagem",
 
   "tool.axis":  "Definir Eixo",
   "tool.scale": "Medida de Referência",
@@ -8,6 +8,7 @@
   "stage.drop":      "Arraste um vídeo aqui",
   "stage.drop_hint": "ou use o seletor abaixo",
   "stage.browse":    "Escolher arquivo",
+  "stage.examples":  "Usar exemplo",
 
   "status.empty":    "Carregue um vídeo para começar",
   "status.loaded":   "{name} — {w}×{h}, {n} frames @ {fps} fps",
@@ -28,11 +29,12 @@
   "setup.not_set": "—",
   "setup.run":     "Iniciar Rastreamento",
   "setup.choose_frame": "Escolher outro frame",
+  "setup.change_video": "Selecionar outro vídeo",
 
   "phase2.title":       "Origem (0,0)",
   "phase2.instruction": "Clique no ponto que será a origem do sistema de coordenadas.",
-  "phase2.confirm":     "Confirmar origem",
-  "phase2.redo":        "Refazer origem",
+  "phase2.confirm":     "Confirmar",
+  "phase2.redo":        "Refazer",
 
   "phase3.title":            "Escala",
   "phase3.instruction":      "Clique em dois pontos com distância conhecida.",
@@ -41,14 +43,14 @@
   "phase3.p2_done":          "Linha definida — informe a distância",
   "phase3.pixels":           "Distância em pixels",
   "phase3.metres":           "Distância (m)",
-  "phase3.metres_placeholder": "Ex: 0.50",
-  "phase3.confirm":          "Confirmar escala",
-  "phase3.redo":             "Refazer linha",
+  "phase3.metres_placeholder": "Tamanho da linha (m)",
+  "phase3.confirm":          "Confirmar",
+  "phase3.redo":             "Refazer",
 
   "phase4.title":       "Selecionar Objeto",
   "phase4.instruction": "Clique e arraste um retângulo em volta do objeto.",
-  "phase4.confirm":     "Confirmar seleção",
-  "phase4.redo":        "Refazer caixa",
+  "phase4.confirm":     "Confirmar",
+  "phase4.redo":        "Refazer",
 
   "tracking.title":   "Rastreando",
   "tracking.cancel":  "Cancelar",
@@ -79,6 +81,7 @@
   "table.title": "Dados",
   "table.empty": "—",
 
+  "col.frame": "frame",
   "col.time": "tempo (s)",
   "col.x":    "x (m)",
   "col.y":    "y (m)",
@@ -93,5 +96,5 @@
 
   "errors.video_load":    "Falha ao carregar vídeo",
   "errors.opencv_load":   "Falha ao carregar OpenCV",
-  "errors.bbox_too_small": "Caixa delimitadora muito pequena"
+  "errors.bbox_too_small": "Selecione uma caixa em volta do objeto"
 }

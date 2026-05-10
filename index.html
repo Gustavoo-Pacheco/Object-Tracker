@@ -4,12 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Object Tracker</title>
+    <title>Rastreador Modelagem</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <nav id="toolbar">
-      <span class="app-title" data-i18n="app.title">Object Tracker</span>
+      <span class="app-title" data-i18n="app.title">Rastreador Modelagem</span>
       <div class="tool-group">
         <button id="tool-axis" class="tool-btn" disabled data-i18n="tool.axis">Definir Eixo</button>
         <button id="tool-scale" class="tool-btn" disabled data-i18n="tool.scale">Medida de Referência</button>
@@ -17,7 +17,17 @@
       </div>
       <div class="toolbar-right">
         <span id="cv-status" class="hint"></span>
+        <button id="btn-change-video" class="tool-btn" hidden data-i18n="setup.change_video">Selecionar outro vídeo</button>
         <button id="btn-reset-frame" class="tool-btn accent-btn" hidden data-i18n="setup.choose_frame">Escolher outro frame</button>
+        <button id="btn-theme" class="icon-btn theme-toggle" type="button" title="Alternar tema" aria-label="Alternar tema">
+          <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+        </button>
       </div>
     </nav>
 
@@ -37,10 +47,19 @@
               </svg>
               <p data-i18n="stage.drop">Arraste um vídeo aqui</p>
               <p class="hint" data-i18n="stage.drop_hint">ou use o seletor abaixo</p>
-              <label class="file-label">
-                <input type="file" id="file" accept="video/*" />
-                <span data-i18n="stage.browse">Escolher arquivo</span>
-              </label>
+              <div class="file-actions">
+                <label class="file-label">
+                  <input type="file" id="file" accept="video/*" />
+                  <span data-i18n="stage.browse">Escolher arquivo</span>
+                </label>
+                <div class="example-picker">
+                  <button type="button" id="btn-examples" class="file-btn" data-i18n="stage.examples">Usar exemplo</button>
+                  <ul id="examples-menu" class="examples-menu" hidden>
+                    <li><button type="button" class="example-item" data-src="/videos/arremesso-mola-2-bolas.mp4" data-name="Arremesso com mola 2 bolas.mp4">Arremesso com mola — 2 bolas</button></li>
+                    <li><button type="button" class="example-item" data-src="/videos/lancamento-obliquo.mp4" data-name="Lancamento Oblíquo.mp4">Lançamento Oblíquo</button></li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -62,6 +81,8 @@
       <aside id="panel">
         <div id="phase-ui"></div>
 
+        <div class="splitter splitter-h" id="split-phase" role="separator" aria-orientation="horizontal" tabindex="0" hidden></div>
+
         <section id="plot-wrap">
           <h2 data-i18n="plot.title">Trajetória</h2>
           <div id="plot">
@@ -72,16 +93,20 @@
         <div class="splitter splitter-h" id="split-panel" role="separator" aria-orientation="horizontal" tabindex="0"></div>
 
         <section id="table-wrap">
-          <h2 data-i18n="table.title">Dados</h2>
+          <div class="table-header">
+            <h2 data-i18n="table.title">Dados</h2>
+            <div id="col-toggles" class="col-toggles" role="group" aria-label="Colunas visíveis"></div>
+          </div>
           <div id="data-table-scroll">
             <table id="data-table">
               <thead>
                 <tr>
-                  <th data-i18n="col.time">tempo (s)</th>
-                  <th data-i18n="col.x">x (m)</th>
-                  <th data-i18n="col.y">y (m)</th>
-                  <th data-i18n="col.vx">vx (m/s)</th>
-                  <th data-i18n="col.vy">vy (m/s)</th>
+                  <th data-col="frame" data-i18n="col.frame">frame</th>
+                  <th data-col="time" data-i18n="col.time">tempo (s)</th>
+                  <th data-col="x" data-i18n="col.x">x (m)</th>
+                  <th data-col="y" data-i18n="col.y">y (m)</th>
+                  <th data-col="vx" data-i18n="col.vx">vx (m/s)</th>
+                  <th data-col="vy" data-i18n="col.vy">vy (m/s)</th>
                 </tr>
               </thead>
               <tbody id="table-body"></tbody>

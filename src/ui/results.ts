@@ -13,9 +13,59 @@ const tableBody = (): HTMLTableSectionElement => document.getElementById('table-
 const tableEmpty = (): HTMLElement => document.getElementById('table-empty')!;
 const plotMount = (): HTMLElement => document.getElementById('plot')!;
 
+type ColKey = 'frame' | 'time' | 'x' | 'y' | 'vx' | 'vy';
+const COL_KEYS: ColKey[] = ['frame', 'time', 'x', 'y', 'vx', 'vy'];
+const COL_STORE_KEY = 'tracker.columns.v1';
+
+function loadCols(): Record<ColKey, boolean> {
+  const def: Record<ColKey, boolean> = { frame: true, time: true, x: true, y: true, vx: true, vy: true };
+  try {
+    const raw = localStorage.getItem(COL_STORE_KEY);
+    if (!raw) return def;
+    const got = JSON.parse(raw) as Partial<Record<ColKey, boolean>>;
+    for (const k of COL_KEYS) if (typeof got[k] === 'boolean') def[k] = got[k]!;
+    return def;
+  } catch { return def; }
+}
+function saveCols(c: Record<ColKey, boolean>): void {
+  try { localStorage.setItem(COL_STORE_KEY, JSON.stringify(c)); } catch { /* quota */ }
+}
+
 let rawSamples: Sample[] = [];
 let smoothing: Smoothing = 'none';
 let yUp = true;
+let cols: Record<ColKey, boolean> = loadCols();
+
+function applyColVisibility(): void {
+  const table = document.getElementById('data-table');
+  if (!table) return;
+  for (const k of COL_KEYS) table.classList.toggle(`hide-${k}`, !cols[k]);
+}
+
+export function mountColumnToggles(): void {
+  const host = document.getElementById('col-toggles');
+  if (!host) return;
+  const labels: Record<ColKey, string> = {
+    frame: t('col.frame'),
+    time: t('col.time'),
+    x: t('col.x'),
+    y: t('col.y'),
+    vx: t('col.vx'),
+    vy: t('col.vy'),
+  };
+  host.innerHTML = COL_KEYS.map(k =>
+    `<label><input type="checkbox" data-col-toggle="${k}" ${cols[k] ? 'checked' : ''}>${labels[k]}</label>`
+  ).join('');
+  host.querySelectorAll<HTMLInputElement>('input[data-col-toggle]').forEach(input => {
+    input.addEventListener('change', () => {
+      const key = input.dataset.colToggle as ColKey;
+      cols = { ...cols, [key]: input.checked };
+      saveCols(cols);
+      applyColVisibility();
+    });
+  });
+  applyColVisibility();
+}
 
 export function setRawSamples(samples: Sample[]): void {
   rawSamples = samples;
@@ -104,14 +154,22 @@ function renderTable(records: TrackRecord[]): void {
   const rows: string[] = [];
   const fmt = (v: number | null): string => v == null ? '—' : v.toFixed(3);
   for (const r of head) rows.push(rowHtml(r, fmt));
-  if (tail.length) rows.push(`<tr class="row-skip"><td colspan="5">… ${records.length - 250} rows …</td></tr>`);
+  if (tail.length) rows.push(`<tr class="row-skip"><td colspan="6">… ${records.length - 250} rows …</td></tr>`);
   for (const r of tail) rows.push(rowHtml(r, fmt));
   tb.innerHTML = rows.join('');
+  applyColVisibility();
 }
 
 function rowHtml(r: TrackRecord, fmt: (v: number | null) => string): string {
   const lost = r[2] == null || r[3] == null;
-  return `<tr class="${lost ? 'lost' : ''}"><td>${r[1].toFixed(3)}</td><td>${fmt(r[2])}</td><td>${fmt(r[3])}</td><td>${fmt(r[4])}</td><td>${fmt(r[5])}</td></tr>`;
+  return `<tr class="${lost ? 'lost' : ''}">`
+    + `<td class="col-frame">${r[0]}</td>`
+    + `<td class="col-time">${r[1].toFixed(3)}</td>`
+    + `<td class="col-x">${fmt(r[2])}</td>`
+    + `<td class="col-y">${fmt(r[3])}</td>`
+    + `<td class="col-vx">${fmt(r[4])}</td>`
+    + `<td class="col-vy">${fmt(r[5])}</td>`
+    + `</tr>`;
 }
 
 // ── Mount: post-process controls in the side panel + reactive renders ──
@@ -173,7 +231,8 @@ export function mountResults(panel: HTMLElement): () => void {
       const n = Math.max(2, Math.floor(Number(exportN.value) || 2));
       records = records.filter((_, i) => i % n === 0);
     }
-    downloadCsv(records, 'trajectory');
+    const visible = COL_KEYS.filter(k => cols[k]);
+    downloadCsv(records, 'trajectory', visible);
   });
 
   panel.querySelector('#restart')!.addEventListener('click', () => {
@@ -183,6 +242,7 @@ export function mountResults(panel: HTMLElement): () => void {
       records: [],
       trackedBboxes: null,
       startFrame: null,
+      status: '',
       phase: 'navigate',
     });
   });

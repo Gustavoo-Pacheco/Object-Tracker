@@ -4,18 +4,32 @@ import './styles.css';
 import { applyDom } from './i18n';
 import { getState, setState, subscribe, type AppState, type Phase } from './state';
 import { render, attachZoomPan, fitDisplaySize } from './ui/canvas';
-import { loadVideo } from './video/loader';
+import { loadVideo, clearVideo } from './video/loader';
 import { FrameCache } from './video/cache';
 import { mountNavigate } from './ui/phases/navigate';
 import { mountOrigin } from './ui/phases/origin';
 import { mountScale } from './ui/phases/scale';
 import { mountBbox } from './ui/phases/bbox';
 import { mountTracking } from './ui/phases/tracking';
-import { mountResults } from './ui/results';
+import { mountResults, mountColumnToggles } from './ui/results';
 import { mountSplitters } from './ui/splitters';
 import { t } from './i18n';
 
 applyDom();
+
+// ── Theme (light/dark) ────────────────────────────────────────
+const THEME_KEY = 'ot.theme';
+type Theme = 'light' | 'dark';
+function applyTheme(theme: Theme): void {
+  document.documentElement.setAttribute('data-theme', theme);
+}
+const storedTheme = (localStorage.getItem(THEME_KEY) as Theme | null) ?? 'dark';
+applyTheme(storedTheme);
+document.getElementById('btn-theme')?.addEventListener('click', () => {
+  const next: Theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  applyTheme(next);
+  localStorage.setItem(THEME_KEY, next);
+});
 
 const canvas      = document.getElementById('stage')      as HTMLCanvasElement;
 const dropOverlay = document.getElementById('drop-overlay')!;
@@ -31,6 +45,7 @@ const toolAxisBtn  = document.getElementById('tool-axis')        as HTMLButtonEl
 const toolScaleBtn = document.getElementById('tool-scale')       as HTMLButtonElement;
 const toolBboxBtn  = document.getElementById('tool-bbox')        as HTMLButtonElement;
 const resetFrameBtn = document.getElementById('btn-reset-frame') as HTMLButtonElement;
+const changeVideoBtn = document.getElementById('btn-change-video') as HTMLButtonElement;
 
 const cache = new FrameCache();
 
@@ -132,6 +147,9 @@ subscribe((s) => {
       && s.phase !== 'tracking' && s.phase !== 'done';
     resetFrameBtn.toggleAttribute('hidden', !showReset);
   }
+  if (changeVideoBtn) {
+    changeVideoBtn.toggleAttribute('hidden', !s.video);
+  }
 
   // Active + done indicators on toolbar buttons
   toolAxisBtn.classList.toggle('active', s.phase === 'origin');
@@ -205,6 +223,7 @@ subscribe((s) => { if (!s.video) cache.clear(); });
 
 attachZoomPan(canvas);
 mountSplitters();
+mountColumnToggles();
 
 // ── Toolbar tool button clicks ────────────────────────────────
 function captureStartFrameIfNavigating(): { startFrame?: number } {
@@ -231,6 +250,7 @@ if (resetFrameBtn) {
       startFrame: null,
       records: [],
       trackedBboxes: null,
+      status: '',
     });
   });
 }
@@ -260,6 +280,58 @@ stageWrap.addEventListener('drop', e => {
 fileInput.addEventListener('change', () => {
   if (fileInput.files?.[0]) handleVideoFile(fileInput.files[0]);
 });
+
+changeVideoBtn?.addEventListener('click', () => {
+  fileInput.value = '';
+  cache.clear();
+  clearVideo();
+  setState({
+    phase: 'idle',
+    video: null,
+    frameIdx: 0,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    origin: null,
+    scalePts: null,
+    metresPerPixel: null,
+    bbox: null,
+    startFrame: null,
+    records: [],
+    trackedBboxes: null,
+    status: t('status.empty'),
+  });
+});
+
+// ── Example videos ───────────────────────────────────────
+const examplesBtn  = document.getElementById('btn-examples') as HTMLButtonElement | null;
+const examplesMenu = document.getElementById('examples-menu') as HTMLUListElement | null;
+if (examplesBtn && examplesMenu) {
+  examplesBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    examplesMenu.hidden = !examplesMenu.hidden;
+  });
+  document.addEventListener('click', e => {
+    if (!examplesMenu.hidden && !examplesMenu.contains(e.target as Node) && e.target !== examplesBtn) {
+      examplesMenu.hidden = true;
+    }
+  });
+  examplesMenu.querySelectorAll<HTMLButtonElement>('.example-item').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const src  = btn.dataset.src!;
+      const name = btn.dataset.name ?? src.split('/').pop()!;
+      examplesMenu.hidden = true;
+      try {
+        const res = await fetch(src);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const file = new File([blob], name, { type: blob.type || 'video/mp4' });
+        await handleVideoFile(file);
+      } catch (err) {
+        cvStatus.textContent = err instanceof Error ? err.message : String(err);
+      }
+    });
+  });
+}
 
 new ResizeObserver(queueRender).observe(stageArea);
 
