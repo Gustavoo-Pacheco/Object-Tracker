@@ -1,4 +1,4 @@
-# Object Tracker
+# Rastreador Modelagem
 
 Python CLI tool for tracking objects in physics experiment videos. Uses OpenCV's CSRT tracker to follow a user-defined bounding box through a video, exporting position and velocity data as CSV and Excel.
 
