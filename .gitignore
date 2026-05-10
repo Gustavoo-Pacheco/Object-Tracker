@@ -25,6 +25,10 @@ output/
 videos/
 .claude/
 
+# Example videos shipped with the site (whitelisted despite *.mp4 / videos/ above)
+!public/videos/
+!public/videos/*.mp4
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
