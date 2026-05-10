@@ -44,14 +44,18 @@ export function mountTracking(panel: HTMLElement): () => void {
     const s = getState();
     const tl = origToDisp(liveBbox.x, liveBbox.y, s, dw, dh);
     const br = origToDisp(liveBbox.x + liveBbox.w, liveBbox.y + liveBbox.h, s, dw, dh);
-    ctx.save();
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-    ctx.fillStyle = '#22c55e';
     const cx = (tl.x + br.x) / 2;
     const cy = (tl.y + br.y) / 2;
-    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    // Bright lime — high-contrast against the red axes and most footage.
+    ctx.strokeStyle = '#a3e635';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    // White centre dot with lime ring for unambiguous centre-of-bbox readout.
+    ctx.fillStyle = '#a3e635';
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#0b0d10';
+    ctx.beginPath(); ctx.arc(cx, cy, 1.6, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   });
 

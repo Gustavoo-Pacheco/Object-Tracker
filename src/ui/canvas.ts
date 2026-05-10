@@ -47,6 +47,10 @@ export function origToDisp(
   };
 }
 
+// Phases where the user is past setup — show only the live tracking overlay,
+// hide the calibration stick and the initial bbox.
+const TRACKING_PHASES = new Set<AppState['phase']>(['tracking', 'done']);
+
 export function render(canvas: HTMLCanvasElement, source: CanvasImageSource, s: AppState): void {
   if (!s.video) return;
   const ctx = canvas.getContext('2d')!;
@@ -59,40 +63,42 @@ export function render(canvas: HTMLCanvasElement, source: CanvasImageSource, s: 
   const vh = s.video.height / s.zoom;
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(source, s.pan.x, s.pan.y, vw, vh, 0, 0, dw, dh);
-  drawAxes(ctx, s, dw, dh);
-  drawScaleLine(ctx, s, dw, dh);
-  drawBbox(ctx, s, dw, dh);
+
+  const tracking = TRACKING_PHASES.has(s.phase);
+  drawAxes(ctx, s, dw, dh, tracking);
+  if (!tracking) {
+    drawScaleLine(ctx, s, dw, dh);
+    drawBbox(ctx, s, dw, dh);
+  }
   getOverlayPainter()?.(ctx, dw, dh);
 }
 
-function drawAxes(ctx: CanvasRenderingContext2D, s: AppState, dw: number, dh: number): void {
+function drawAxes(
+  ctx: CanvasRenderingContext2D,
+  s: AppState, dw: number, dh: number,
+  _tracking: boolean,
+): void {
   if (!s.origin || !s.video) return;
   const { x: ox, y: oy } = origToDisp(s.origin.x, s.origin.y, s, dw, dh);
-  const CYAN = 'rgba(0, 220, 220, 0.55)';
-  const CYAN_SOLID = 'rgb(0, 220, 220)';
+
+  const stroke = 'rgba(239, 68, 68, 0.75)';
+  const solid  = '#ef4444';
 
   ctx.save();
 
-  // Full-frame axis lines — thin, semi-transparent, extending to canvas edges
-  ctx.strokeStyle = CYAN;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath(); ctx.moveTo(0, oy);  ctx.lineTo(dw, oy);  ctx.stroke(); // X axis (horizontal)
-  ctx.beginPath(); ctx.moveTo(ox, 0);  ctx.lineTo(ox, dh);  ctx.stroke(); // Y axis (vertical)
-  ctx.setLineDash([]);
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 1.25;
+  ctx.beginPath(); ctx.moveTo(0, oy);  ctx.lineTo(dw, oy);  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox, 0);  ctx.lineTo(ox, dh);  ctx.stroke();
 
-  // Edge labels — show axis name at the canvas boundary
   ctx.font = '11px ui-monospace, monospace';
-  ctx.fillStyle = CYAN_SOLID;
+  ctx.fillStyle = solid;
   ctx.textAlign = 'left';
-  ctx.fillText('+X', dw - 22, oy - 5);       // right edge
+  ctx.fillText('+X', dw - 22, oy - 5);
   ctx.textAlign = 'center';
-  ctx.fillText('+Y', ox + 2, 14);              // top edge (Y up = positive)
+  ctx.fillText('+Y', ox + 2, 14);
 
-  // Origin dot + "0" label
-  ctx.fillStyle = CYAN_SOLID;
   ctx.beginPath(); ctx.arc(ox, oy, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.font = '11px ui-monospace, monospace';
   ctx.textAlign = 'left';
   ctx.fillText('0', ox + 6, oy - 6);
 

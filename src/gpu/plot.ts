@@ -19,7 +19,8 @@ struct U { scale: vec2f, offset: vec2f };
 }
 
 @fragment fn fs() -> @location(0) vec4f {
-  return vec4f(0.298, 0.788, 0.502, 1.0);
+  // Lime — matches the live tracker bbox accent.
+  return vec4f(0.639, 0.902, 0.208, 1.0);
 }
 `;
 
@@ -169,7 +170,7 @@ export async function renderPlot(
     const c2d = (glCanvas.getContext('2d') as Ctx2D | null);
     if (!c2d) return;
     c2d.clearRect(0, 0, glCanvas.width, glCanvas.height);
-    c2d.strokeStyle = '#4ade80';
+    c2d.strokeStyle = '#a3e635';
     c2d.lineWidth = 2;
     c2d.beginPath();
     let started = false;
