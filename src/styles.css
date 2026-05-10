@@ -581,6 +581,44 @@ button.secondary:hover { background: rgba(59, 130, 246, 0.1); }
 }
 #phase-ui #run-from-setup { width: 100%; font-size: 13px; padding: 8px; }
 
+/* Tracking + results */
+.tracking-progress { margin: 8px 0 12px; }
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+.results-controls { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.results-controls select { width: 100%; }
+.check-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted); margin-top: 4px;
+}
+.row-skip td {
+  text-align: center !important;
+  color: var(--muted);
+  font-style: italic;
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Plot canvases stack */
+#plot canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#plot canvas.plot-ax { pointer-events: none; }
+
 /* Tool button done indicator */
 .tool-btn.done::after {
   content: '●';

@@ -10,6 +10,8 @@ import { mountNavigate } from './ui/phases/navigate';
 import { mountOrigin } from './ui/phases/origin';
 import { mountScale } from './ui/phases/scale';
 import { mountBbox } from './ui/phases/bbox';
+import { mountTracking } from './ui/phases/tracking';
+import { mountResults } from './ui/results';
 import { t } from './i18n';
 
 applyDom();
@@ -158,6 +160,12 @@ subscribe((s) => {
 
     if (s.phase === 'navigate') {
       unmountCurrent = mountNavigate(navBar, (_idx) => {});
+    }
+
+    if (s.phase === 'tracking') {
+      unmountCurrent = mountTracking(phaseUi);
+    } else if (s.phase === 'done') {
+      unmountCurrent = mountResults(phaseUi);
     }
   }
 

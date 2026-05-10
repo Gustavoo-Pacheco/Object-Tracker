@@ -49,8 +49,9 @@
   "phase4.confirm":     "Confirmar seleção",
   "phase4.redo":        "Refazer caixa",
 
+  "tracking.title":   "Rastreando",
   "tracking.cancel":  "Cancelar",
-  "tracking.lost":    "Frames perdidos",
+  "tracking.lost":    "Perdidos",
   "tracking.elapsed": "Tempo decorrido",
 
   "pb.play":  "▶",
@@ -61,6 +62,12 @@
   "results.lost":          "Perdidos",
   "results.fill_nan":      "Preencher NaN com média dos 2 últimos",
   "results.restart":       "Reiniciar",
+  "results.smoothing":     "Suavização",
+  "results.smooth.none":   "Nenhuma",
+  "results.smooth.ma5":    "Média móvel (5)",
+  "results.smooth.ma7":    "Média móvel (7)",
+  "results.smooth.sg5":    "Savitzky–Golay (5, 2)",
+  "results.yup":           "Y para cima",
 
   "plot.title": "Trajetória",
   "plot.empty": "Nenhum dado. Rastreie um vídeo para ver os resultados.",
