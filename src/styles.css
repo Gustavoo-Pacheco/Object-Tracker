@@ -281,7 +281,6 @@ body.resizing.h { cursor: row-resize; }
 
 .file-label {
   display: inline-block;
-  margin-top: 4px;
   cursor: pointer;
 }
 .file-label input[type="file"] { display: none; }
