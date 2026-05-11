@@ -73,6 +73,10 @@ export function mountTracking(panel: HTMLElement): () => void {
     const s0 = getState();
     if (!s0.video || !s0.bbox) { abort('missing video or bbox'); return; }
     const { fps, totalFrames } = s0.video;
+    if (!isFinite(totalFrames) || totalFrames <= 1) {
+      abort('could not determine video duration — try a different file');
+      return;
+    }
     const startFrame = s0.startFrame ?? 0;
     const stride = Math.max(1, s0.frameStride | 0);
     const video = document.getElementById('src') as HTMLVideoElement;

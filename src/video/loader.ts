@@ -30,6 +30,11 @@ export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<
     video.onerror = () => reject(new Error(t('errors.video_load')));
   });
 
+  // Some containers (notably MediaRecorder WebMs and certain MP4s) report
+  // duration as Infinity or 0 on loadedmetadata. Force the browser to walk
+  // to the end so it computes the real duration, then seek back to 0.
+  await ensureFiniteDuration(video);
+
   const fps = await detectFps(video);
 
   await seekTo(video, 0);
@@ -55,6 +60,29 @@ export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<
       n: totalFrames,
       fps: fps.toFixed(1),
     }),
+  });
+}
+
+// Forces the browser to resolve a real duration for containers that report
+// Infinity/0 on loadedmetadata (MediaRecorder WebMs, some MP4s). Seeks far
+// past the end — the browser clamps currentTime to the real duration and
+// fires durationchange with the resolved value.
+async function ensureFiniteDuration(video: HTMLVideoElement): Promise<void> {
+  if (isFinite(video.duration) && video.duration > 0) return;
+  await new Promise<void>(resolve => {
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener('durationchange', onChange);
+      resolve();
+    };
+    const onChange = (): void => {
+      if (isFinite(video.duration) && video.duration > 0) finish();
+    };
+    video.addEventListener('durationchange', onChange);
+    video.currentTime = 1e9;
+    setTimeout(finish, 3000);
   });
 }
 
