@@ -114,6 +114,8 @@ export function mountTracking(panel: HTMLElement): () => void {
     const total = Math.max(0, Math.floor((totalFrames - 1 - startFrame) / stride));
     let processed = 0;
     let lost = 0;
+    let consecutiveLost = 0;
+    const STOP_AFTER_LOST = 7; // abandon tracking after this many consecutive missed frames
 
     for (let i = startFrame + stride; i < totalFrames; i += stride) {
       if (cancelled || stopped) break;
@@ -122,6 +124,7 @@ export function mountTracking(panel: HTMLElement): () => void {
       if (upd) {
         liveBbox = upd.bbox;
         lastLost = false;
+        consecutiveLost = 0;
         trackedBboxes.set(i, { ...upd.bbox });
         samples.push({ idx: i, t: i / fps, cxPx: upd.center.cx, cyPx: upd.center.cy, lost: false });
       } else {
@@ -129,7 +132,19 @@ export function mountTracking(panel: HTMLElement): () => void {
         // overlay has something to draw on.
         lastLost = true;
         lost++;
+        consecutiveLost++;
         samples.push({ idx: i, t: i / fps, cxPx: null, cyPx: null, lost: true });
+      }
+
+      // Once the object has been missing for STOP_AFTER_LOST consecutive frames,
+      // stop the loop. Global re-search inside the tracker has had its chance
+      // and continuing would just append null samples forever.
+      if (consecutiveLost >= STOP_AFTER_LOST) {
+        processed++;
+        setState({ frameIdx: i, status: t('status.tracking', { done: processed, total }) });
+        schedulePreview();
+        text.textContent = `${processed} / ${total}  ·  ${t('tracking.lost')}: ${lost}`;
+        break;
       }
 
       // Drive UI: update status + frameIdx, and render the canvas directly from
