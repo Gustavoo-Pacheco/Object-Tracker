@@ -3,6 +3,7 @@
 // (with Canvas2D fallback). Designed to be driven by the tracking loop.
 
 import { framePixels } from '../gpu/device';
+import { getState } from '../state';
 
 export type Frame = { idx: number; t: number; pixels: Uint8Array; w: number; h: number };
 
@@ -13,8 +14,12 @@ export async function readFrame(
 ): Promise<Frame> {
   const t = idx / fps;
   await seek(video, t);
-  const w = video.videoWidth;
-  const h = video.videoHeight;
+  // Read at the *processing* resolution stored in state. framePixels renders
+  // the external video texture into a destination of size (w, h), so the GPU
+  // downsamples for us — no extra cost beyond a smaller readback.
+  const s = getState();
+  const w = s.video?.width ?? video.videoWidth;
+  const h = s.video?.height ?? video.videoHeight;
   const pixels = await framePixels(video, w, h);
   return { idx, t, pixels, w, h };
 }

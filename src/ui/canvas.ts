@@ -62,7 +62,12 @@ export function render(canvas: HTMLCanvasElement, source: CanvasImageSource, s: 
   const vw = s.video.width / s.zoom;
   const vh = s.video.height / s.zoom;
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(source, s.pan.x, s.pan.y, vw, vh, 0, 0, dw, dh);
+  // drawImage source rect is in the *native* pixel space when sampling from a
+  // <video> element, but s.pan / vw / vh live in our (possibly downscaled)
+  // processing space. Scale up by native/logical so the same area is sampled.
+  const sx = s.video.nativeW / s.video.width;
+  const sy = s.video.nativeH / s.video.height;
+  ctx.drawImage(source, s.pan.x * sx, s.pan.y * sy, vw * sx, vh * sy, 0, 0, dw, dh);
 
   const tracking = TRACKING_PHASES.has(s.phase);
   drawAxes(ctx, s, dw, dh, tracking);

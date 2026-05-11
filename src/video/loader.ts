@@ -41,11 +41,20 @@ export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<
 
   const totalFrames = Math.floor(video.duration * fps);
 
+  // Cap processing resolution at 1920px long edge. Decoding cost stays the
+  // same (browser always decodes natively), but every frame readback,
+  // template-matching pass, and overlay paint becomes cheaper — most of the
+  // visible "lag" when scrubbing 4K video comes from the per-frame readback
+  // and downstream work, not the decode itself.
+  const { w: procW, h: procH } = capLongEdge(video.videoWidth, video.videoHeight, 1920);
+
   setState({
     video: {
       fps,
-      width: video.videoWidth,
-      height: video.videoHeight,
+      width: procW,
+      height: procH,
+      nativeW: video.videoWidth,
+      nativeH: video.videoHeight,
       totalFrames,
       src: url,
     },
@@ -55,12 +64,25 @@ export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<
     phase: 'navigate',
     status: t('status.loaded', {
       name: file.name,
-      w: video.videoWidth,
-      h: video.videoHeight,
+      w: procW,
+      h: procH,
       n: totalFrames,
       fps: fps.toFixed(1),
     }),
   });
+}
+
+// Caps the longest edge at `maxEdge` while preserving aspect ratio. Returns
+// the original dimensions if both edges are already within the cap. Rounds
+// to even integers — some downstream paths (e.g. WebGPU's bytesPerRow align)
+// behave better on even widths.
+function capLongEdge(w: number, h: number, maxEdge: number): { w: number; h: number } {
+  const long = Math.max(w, h);
+  if (long <= maxEdge) return { w, h };
+  const scale = maxEdge / long;
+  const nw = Math.max(2, Math.round((w * scale) / 2) * 2);
+  const nh = Math.max(2, Math.round((h * scale) / 2) * 2);
+  return { w: nw, h: nh };
 }
 
 // Forces the browser to resolve a real duration for containers that report

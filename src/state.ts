@@ -11,7 +11,11 @@ export type TrackRecord = [
 
 export type AppState = {
   phase: Phase;
-  video: { fps: number; width: number; height: number; totalFrames: number; src: string } | null;
+  // width/height are the *processing* dims (capped — bbox, origin, scale, and
+  // all coords in state live in this space). nativeW/nativeH are the actual
+  // <video> element dimensions, needed only when sampling from the video for
+  // canvas draws. They are equal when the video is already within the cap.
+  video: { fps: number; width: number; height: number; nativeW: number; nativeH: number; totalFrames: number; src: string } | null;
   frameIdx: number;
   zoom: number;
   pan: { x: number; y: number };
