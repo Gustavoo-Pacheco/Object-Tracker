@@ -24,8 +24,11 @@ export class FrameCache {
     if (!s.video) return Promise.resolve(null);
     const video = document.getElementById('src') as HTMLVideoElement;
     const targetTime = idx / s.video.fps;
-    const targetW = s.video.width;
-    const targetH = s.video.height;
+    // Display bitmaps are always at native (post-rotation) dims so that
+    // render()'s sx/sy scaling — which maps processing coords to native
+    // pixel space — samples the full frame correctly.
+    const targetW = s.video.nativeW;
+    const targetH = s.video.nativeH;
     return new Promise(resolve => {
       const onSeeked = () => {
         bitmapAtDisplaySize(video, targetW, targetH)
