@@ -39,22 +39,31 @@ export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<
 
   await seekTo(video, 0);
 
+  // Probe the actual rendered frame dimensions. For files with rotation
+  // metadata (e.g. portrait phone videos), some browsers report the
+  // pre-rotation size in videoWidth/Height while the decoded frame
+  // (what drawImage / createImageBitmap actually produces) is rotated.
+  // Trusting the bitmap here keeps the entire pipeline (display, tracking,
+  // bbox/origin coords) in one consistent coordinate system.
+  const { w, h } = await probeFrameSize(video);
+
   const totalFrames = Math.floor(video.duration * fps);
 
-  // Cap processing resolution at 1920px long edge. Decoding cost stays the
-  // same (browser always decodes natively), but every frame readback,
-  // template-matching pass, and overlay paint becomes cheaper — most of the
-  // visible "lag" when scrubbing 4K video comes from the per-frame readback
-  // and downstream work, not the decode itself.
-  const { w: procW, h: procH } = capLongEdge(video.videoWidth, video.videoHeight, 1920);
+  // Cap processing resolution at 1920px long edge — applied to the *display*
+  // (post-rotation) dims from probeFrameSize, not the raw codec dims, so
+  // portrait videos cap correctly along their visual long edge.
+  const { w: procW, h: procH } = capLongEdge(w, h, 1920);
 
   setState({
     video: {
       fps,
       width: procW,
       height: procH,
-      nativeW: video.videoWidth,
-      nativeH: video.videoHeight,
+      // Native dims are the *display* dims (uncapped). These are what the
+      // FrameCache bitmaps and drawImage sample from — keeping them post-
+      // rotation means src rects line up with rotated phone-recorded videos.
+      nativeW: w,
+      nativeH: h,
       totalFrames,
       src: url,
     },
@@ -83,6 +92,31 @@ function capLongEdge(w: number, h: number, maxEdge: number): { w: number; h: num
   const nw = Math.max(2, Math.round((w * scale) / 2) * 2);
   const nh = Math.max(2, Math.round((h * scale) / 2) * 2);
   return { w: nw, h: nh };
+}
+
+async function probeFrameSize(video: HTMLVideoElement): Promise<{ w: number; h: number }> {
+  // Preferred: WebCodecs VideoFrame exposes displayWidth/displayHeight
+  // (post-rotation, the dimensions the video is meant to be presented at),
+  // which is exactly what we need for portrait phone videos whose
+  // videoWidth/Height report the pre-rotation codec dims.
+  const VF = (globalThis as any).VideoFrame;
+  if (typeof VF === 'function') {
+    try {
+      const vf = new VF(video);
+      const w = vf.displayWidth ?? vf.codedWidth;
+      const h = vf.displayHeight ?? vf.codedHeight;
+      vf.close();
+      if (w > 0 && h > 0) return { w, h };
+    } catch { /* fall through */ }
+  }
+  try {
+    const bm = await createImageBitmap(video);
+    const w = bm.width;
+    const h = bm.height;
+    bm.close();
+    if (w > 0 && h > 0) return { w, h };
+  } catch { /* fall through */ }
+  return { w: video.videoWidth, h: video.videoHeight };
 }
 
 // Forces the browser to resolve a real duration for containers that report

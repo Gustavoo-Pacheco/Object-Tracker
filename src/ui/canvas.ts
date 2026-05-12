@@ -15,12 +15,24 @@
 import { getState, setState, type AppState } from '../state';
 import { getOverlayPainter } from './overlay';
 
-const MAX_DISP_W = 1280;
-const MAX_DISP_H = 720;
+const FALLBACK_MAX_W = 1280;
+const FALLBACK_MAX_H = 720;
+
+function stageAreaSize(): { w: number; h: number } {
+  const el = document.getElementById('stage-area');
+  if (!el) return { w: FALLBACK_MAX_W, h: FALLBACK_MAX_H };
+  const r = el.getBoundingClientRect();
+  // During first paint the container can briefly be 0×0; fall back so we
+  // don't collapse the canvas to nothing.
+  const w = r.width  > 0 ? r.width  : FALLBACK_MAX_W;
+  const h = r.height > 0 ? r.height : FALLBACK_MAX_H;
+  return { w, h };
+}
 
 export function fitDisplaySize(fw: number, fh: number): { dw: number; dh: number } {
-  const s = Math.min(MAX_DISP_W / fw, MAX_DISP_H / fh, 1);
-  return { dw: Math.round(fw * s), dh: Math.round(fh * s) };
+  const { w: cw, h: ch } = stageAreaSize();
+  const s = Math.min(cw / fw, ch / fh, 1);
+  return { dw: Math.max(1, Math.round(fw * s)), dh: Math.max(1, Math.round(fh * s)) };
 }
 
 export function dispToOrig(
@@ -59,6 +71,13 @@ export function render(canvas: HTMLCanvasElement, source: CanvasImageSource, s: 
     canvas.width = dw;
     canvas.height = dh;
   }
+  // Pin CSS box to buffer dims so aspect ratio is preserved exactly (the
+  // stylesheet's max-width/max-height fallback can squash a portrait canvas
+  // inside a flex-centered container otherwise).
+  const cssW = `${dw}px`;
+  const cssH = `${dh}px`;
+  if (canvas.style.width !== cssW)  canvas.style.width  = cssW;
+  if (canvas.style.height !== cssH) canvas.style.height = cssH;
   const vw = s.video.width / s.zoom;
   const vh = s.video.height / s.zoom;
   ctx.imageSmoothingEnabled = true;

@@ -14,11 +14,12 @@ export async function readFrame(
 ): Promise<Frame> {
   const t = idx / fps;
   await seek(video, t);
-  // Read at the *processing* resolution stored in state. framePixels renders
-  // the external video texture into a destination of size (w, h), so the GPU
-  // downsamples for us — no extra cost beyond a smaller readback.
+  // Read at the *processing* resolution stored in state — capped display dims
+  // (post-rotation). framePixels renders the external video texture into a
+  // destination of size (w, h), so the GPU downsamples for us — no extra cost
+  // beyond a smaller readback.
   const s = getState();
-  const w = s.video?.width ?? video.videoWidth;
+  const w = s.video?.width  ?? video.videoWidth;
   const h = s.video?.height ?? video.videoHeight;
   const pixels = await framePixels(video, w, h);
   return { idx, t, pixels, w, h };
