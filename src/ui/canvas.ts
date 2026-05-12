@@ -31,7 +31,7 @@ function stageAreaSize(): { w: number; h: number } {
 
 export function fitDisplaySize(fw: number, fh: number): { dw: number; dh: number } {
   const { w: cw, h: ch } = stageAreaSize();
-  const s = Math.min(cw / fw, ch / fh, 1);
+  const s = Math.min(cw / fw, ch / fh);
   return { dw: Math.max(1, Math.round(fw * s)), dh: Math.max(1, Math.round(fh * s)) };
 }
 
