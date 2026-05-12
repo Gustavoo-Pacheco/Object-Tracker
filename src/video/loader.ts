@@ -3,6 +3,15 @@ import { t } from '../i18n';
 
 let currentObjectUrl: string | null = null;
 
+export type VideoMeta = {
+  fps: number;
+  nativeW: number;
+  nativeH: number;
+  duration: number;
+  name: string;
+  url: string;
+};
+
 export function clearVideo(): void {
   if (currentObjectUrl) {
     URL.revokeObjectURL(currentObjectUrl);
@@ -11,9 +20,7 @@ export function clearVideo(): void {
   (document.getElementById('src') as HTMLVideoElement).src = '';
 }
 
-export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<void> {
-  onBeforeLoad?.();
-
+export async function loadVideoMeta(file: File): Promise<VideoMeta> {
   const video = document.getElementById('src') as HTMLVideoElement;
 
   if (currentObjectUrl) {
@@ -36,7 +43,6 @@ export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<
   await ensureFiniteDuration(video);
 
   const fps = await detectFps(video);
-
   await seekTo(video, 0);
 
   // Probe the actual rendered frame dimensions. For files with rotation
@@ -47,36 +53,36 @@ export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<
   // bbox/origin coords) in one consistent coordinate system.
   const { w, h } = await probeFrameSize(video);
 
-  const totalFrames = Math.floor(video.duration * fps);
+  return { fps, nativeW: w, nativeH: h, duration: video.duration, name: file.name, url };
+}
 
-  // Cap processing resolution at 1920px long edge — applied to the *display*
-  // (post-rotation) dims from probeFrameSize, not the raw codec dims, so
-  // portrait videos cap correctly along their visual long edge.
-  const { w: procW, h: procH } = capLongEdge(w, h, 1920);
+export function applyVideoSettings(meta: VideoMeta, maxLongEdge: number): void {
+  const { w: procW, h: procH } = capLongEdge(meta.nativeW, meta.nativeH, maxLongEdge);
+  const totalFrames = Math.floor(meta.duration * meta.fps);
 
   setState({
     video: {
-      fps,
+      fps: meta.fps,
       width: procW,
       height: procH,
       // Native dims are the *display* dims (uncapped). These are what the
       // FrameCache bitmaps and drawImage sample from — keeping them post-
       // rotation means src rects line up with rotated phone-recorded videos.
-      nativeW: w,
-      nativeH: h,
+      nativeW: meta.nativeW,
+      nativeH: meta.nativeH,
       totalFrames,
-      src: url,
+      src: meta.url,
     },
     frameIdx: 0,
     zoom: 1,
     pan: { x: 0, y: 0 },
     phase: 'navigate',
     status: t('status.loaded', {
-      name: file.name,
+      name: meta.name,
       w: procW,
       h: procH,
       n: totalFrames,
-      fps: fps.toFixed(1),
+      fps: meta.fps.toFixed(1),
     }),
   });
 }
@@ -85,7 +91,7 @@ export async function loadVideo(file: File, onBeforeLoad?: () => void): Promise<
 // the original dimensions if both edges are already within the cap. Rounds
 // to even integers — some downstream paths (e.g. WebGPU's bytesPerRow align)
 // behave better on even widths.
-function capLongEdge(w: number, h: number, maxEdge: number): { w: number; h: number } {
+export function capLongEdge(w: number, h: number, maxEdge: number): { w: number; h: number } {
   const long = Math.max(w, h);
   if (long <= maxEdge) return { w, h };
   const scale = maxEdge / long;

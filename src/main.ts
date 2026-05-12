@@ -4,7 +4,8 @@ import './styles.css';
 import { applyDom } from './i18n';
 import { getState, setState, subscribe, type AppState, type Phase } from './state';
 import { render, attachZoomPan, fitDisplaySize } from './ui/canvas';
-import { loadVideo, clearVideo } from './video/loader';
+import { loadVideoMeta, applyVideoSettings, clearVideo } from './video/loader';
+import { showVideoOptionsModal } from './ui/videoOptions';
 import { FrameCache } from './video/cache';
 import { mountNavigate } from './ui/phases/navigate';
 import { mountOrigin } from './ui/phases/origin';
@@ -107,7 +108,6 @@ function renderSetupPanel(s: AppState): void {
   `;
 
   phaseUi.querySelector('#run-from-setup')?.addEventListener('click', () => {
-    if (getState().frameStride !== 1) setState({ frameStride: 1 });
     setState({ phase: 'tracking' });
   });
 }
@@ -258,7 +258,17 @@ if (resetFrameBtn) {
 // ── Video file handling ───────────────────────────────────────
 async function handleVideoFile(file: File): Promise<void> {
   try {
-    await loadVideo(file, () => cache.clear());
+    setState({ status: 'Carregando vídeo…' });
+    const meta = await loadVideoMeta(file);
+    const options = await showVideoOptionsModal(meta);
+    if (!options) {
+      clearVideo();
+      setState({ status: t('status.empty') });
+      return;
+    }
+    cache.clear();
+    applyVideoSettings(meta, options.longEdge);
+    setState({ frameStride: options.stride });
   } catch (err) {
     cvStatus.textContent = err instanceof Error ? err.message : String(err);
   }

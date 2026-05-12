@@ -949,4 +949,217 @@ input[type="range"]::-moz-range-thumb {
 .theme-toggle .theme-icon-sun { display: none; }
 .theme-toggle .theme-icon-moon { display: block; }
 :root[data-theme="light"] .theme-toggle .theme-icon-sun { display: block; }
+
+/* ══════════════════════════════════════════════════════════════
+   VIDEO OPTIONS MODAL
+══════════════════════════════════════════════════════════════ */
+.vo-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.vo-card {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-family: var(--sans);
+}
+
+.vo-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.vo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vo-filename {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vo-meta {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.vo-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vo-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.vo-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vo-pill {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: 12px;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.vo-pill:hover {
+  border-color: var(--hover-border);
+  background: var(--hover-bg);
+  color: var(--hover-fg);
+}
+
+.vo-pill.active {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vo-slider-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vo-slider {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+  height: 4px;
+}
+
+.vo-slider-labels {
+  display: flex;
+  justify-content: space-between;
+}
+
+.vo-slider-labels span {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  transition: color 0.12s;
+  cursor: pointer;
+  user-select: none;
+}
+
+.vo-slider-labels span.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.vo-slider-ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1px;
+}
+
+.vo-slider-ends span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.vo-estimate {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.vo-est-frames {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  font-family: var(--mono);
+}
+
+.vo-est-dims {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.vo-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.vo-btn-cancel {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.vo-btn-cancel:hover {
+  border-color: var(--hover-border);
+  color: var(--fg);
+}
+
+.vo-btn-confirm {
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.vo-btn-confirm:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.vo-btn-confirm:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 :root[data-theme="light"] .theme-toggle .theme-icon-moon { display: none; }
